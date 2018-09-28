@@ -1,0 +1,13 @@
+version: "3"
+services:
+  kademlianodes:
+    build: .
+    stdin_open: true
+    tty: true    
+    expose:
+      - "8080/udp"
+    networks:
+      - kademlia_network
+      
+networks:
+  kademlia_network:

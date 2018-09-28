@@ -1,0 +1,12 @@
+syntax="proto3";
+
+package d7024e;
+
+message Kmessage {
+	string label = 1;
+	string senderId = 2;
+	string senderAddr = 3;
+}
+
+// COMPILE
+// protoc --go_out=. *.proto
