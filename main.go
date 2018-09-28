@@ -1,33 +1,33 @@
 package main
 
 import (
+	"d7024e"
+	"container/list"
 	"fmt"
-	"log"
-
-	"github.com/golang/protobuf/proto"
+	"net"
+	"sync"
+	"time"
 )
 
 func main() {
 
-	etem := &Person{
-		Name: "Etem",
-		Age:  14,
-	}
+	fmt.Println("Listening... Give command")
 
-	data, err := proto.Marshal(etem)
-	if err != nil {
-		log.Fatal("marshaling error: ", err)
-	}
+	//Skapar allt och startar listen på alla
+	id1 := NewKademliaID("kuk")
+	id2 := NewKademliaID("fitta")
 
-	fmt.Println(data)
+	contact1 := NewContact(id1, "172.18.0.2:8080")
+	contact2 := NewContact(id2, "172.18.0.3:8080")
 
-	newEtem := &Person{}
-	err = proto.Unmarshal(data, newEtem)
-	if err != nil {
-		log.Fatal("unmarshaling error: ", err)
-	}
+	node1 := NewKademlia(contact1)
+	node2 := NewKademlia(contact2)
 
-	fmt.Println(newEtem.GetAge())
-	fmt.Println(newEtem.GetName())
+  //time.Sleep(5*60*1000 * time.Millisecond)
+
+	go node1.GetNetwork().Listen(contact1)
+	go node2.GetNetwork().Listen(contact2)
+
+	node1.GetNetwork().SendPingMessage(&contact2)
 
 }
