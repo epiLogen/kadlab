@@ -2,6 +2,8 @@ package d7024e
 
 type Network struct {
   me  Contact
+  rt  *RoutingTable
+  lookupResp [][]Contact
 }
 
 type RpcHandler struct {
@@ -119,4 +121,8 @@ func (network *Network) SendFindDataMessage(hash string) {
 
 func (network *Network) SendStoreMessage(data []byte) {
 	// TODO
+}
+
+func (network *Network) refreshRT(resp []Contact) {
+  // should try to refresh rt using contacts from a lookupresponse
 }
