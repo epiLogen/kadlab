@@ -1,5 +1,5 @@
 package d7024e
-
+//Komment
 import (
 	"kadlab/protobuf"
 	"fmt"
