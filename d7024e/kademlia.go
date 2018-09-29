@@ -1,6 +1,8 @@
 package d7024e
 
-import "sync"
+import (
+	"sync"
+)
 
 type Kademlia struct {
 	net   Network

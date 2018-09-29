@@ -1,5 +1,9 @@
 package d7024e
 
+import (
+	"fmt"
+)
+
 const bucketSize = 20
 
 

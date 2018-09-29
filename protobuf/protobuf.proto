@@ -1,6 +1,6 @@
 syntax="proto3";
 
-package d7024e;
+package protobuf;
 
 message Kmessage {
 	string label = 1;

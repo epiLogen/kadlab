@@ -1,11 +1,12 @@
 package d7024e
 
 import (
-	"container/list"
+	"kadlab/protobuf"
 	"fmt"
 	"net"
 	"sync"
 	"time"
+	"github.com/golang/protobuf/proto"
 )
 
 type Network struct {
@@ -36,7 +37,7 @@ func NewNetwork(me Contact, rt *RoutingTable) Network {
 //   return rpc
 // }
 
-func handleRPC(ch []byte, me *Contact, net *Network){
+func handleRPC(ch chan []byte, me *Contact, net *Network){
   rawdata := <-ch
   message := &protobuf.Kmessage{}
 
@@ -45,10 +46,10 @@ func handleRPC(ch []byte, me *Contact, net *Network){
     fmt.Println(err)
   }
   //Ping findnode findvalue store
-  switch message.GetType() {
+  switch message.GetLabel() {
   case "ping":
     fmt.Println("Just got pinged omg")
-    fmt.Println("type:", message.GetType())
+    fmt.Println("label:", message.GetLabel())
     fmt.Println("senderID:", message.GetSenderId())
     fmt.Println("senderAddr:", message.GetSenderAddr())
 
@@ -57,27 +58,48 @@ func handleRPC(ch []byte, me *Contact, net *Network){
 
 
   case "pingresp":
-    mtx.Lock()
+    net.mtx.Lock()
     fmt.Println("I got pingresponse from:", message.GetSenderId(), message.GetSenderAddr())
-    pingResp = append(pingResp, me)
-    mtx.Unlock()
+    net.pingResp = append(net.pingResp, me)
+    net.mtx.Unlock()
 
 
   default:
     fmt.Println("Wrong message")
+		fmt.Println("label:", message.GetLabel())
+		fmt.Println("senderID:", message.GetSenderId())
+		fmt.Println("senderAddr:", message.GetSenderAddr())
   }
 
 }
 
-func buildMessage(input []string) *Kmessage {
+func buildMessage(input []string) *protobuf.Kmessage {
+	fmt.Println(input[0])
   switch input[0] {
   case "ping":
-    message = &Kmessage{
-      label:     proto.String(input[0]),
-      senderId: proto.String(input[1]),
-      senderAddr: proto.String(input[2]),
+		fmt.Println("Building Ping")
+    message := &protobuf.Kmessage{
+      Label:     *proto.String(input[0]),
+      SenderId: *proto.String(input[1]),
+      SenderAddr: *proto.String(input[2]),
     }
     return message
+	case "pingresp":
+		fmt.Println("Bulding pingresp")
+		message := &protobuf.Kmessage{
+			Label:     *proto.String(input[0]),
+			SenderId: *proto.String(input[1]),
+			SenderAddr: *proto.String(input[2]),
+		}
+		return message
+	default:
+		fmt.Println("Building Error message")
+		message := &protobuf.Kmessage{
+			Label:     *proto.String("Error"),
+			SenderId: *proto.String(input[1]),
+			SenderAddr: *proto.String(input[2]),
+		}
+		return message
   }
 }
 
@@ -86,7 +108,7 @@ func (network *Network) SendPingMessage(contact *Contact) {
   sendMessage(contact.Address, message)
 }
 
-func sendMessage(Address string, message *protobuf.KademliaMessage) {
+func sendMessage(Address string, message *protobuf.Kmessage) {
 	if len(Address) >= 14 {
 		//fmt.Println("send to anddress: ", Address)
 		data, err := proto.Marshal(message)
@@ -113,6 +135,7 @@ func (network *Network) Listen(me Contact) {
 	Addr, err1 := net.ResolveUDPAddr("udp", me.Address)
 	Conn, err2 := net.ListenUDP("udp", Addr)
   defer Conn.Close()
+	fmt.Println("1")
 
 	if (err1 != nil) || (err2 != nil) {
 		fmt.Println("Resolve error:", err1)
@@ -121,11 +144,14 @@ func (network *Network) Listen(me Contact) {
 
   ch := make(chan []byte)
 	buffer := make([]byte, 4096)
+	fmt.Println("2")
 
 	for {
     time.Sleep(10 * time.Millisecond)
-
+		fmt.Println("Väntar")
 		n, _, err1 := Conn.ReadFromUDP(buffer)
+
+		fmt.Println("3")
 
 		if err1 != nil {
 			fmt.Println("Read Error:", err1)
@@ -133,7 +159,9 @@ func (network *Network) Listen(me Contact) {
 
 		rawdata := buffer[:n]
     go handleRPC(ch, &me, network)
+		fmt.Println("4")
     ch <- rawdata
+		fmt.Println("5")
 	}
 }
 
