@@ -1,5 +1,5 @@
 package d7024e
-
+//Komment
 import (
 	"sync"
 )

@@ -1,5 +1,7 @@
 package main
 
+//Komment
+
 import (
 	kad "kadlab/d7024e"
 	"fmt"
