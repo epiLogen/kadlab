@@ -13,7 +13,8 @@ type Network struct {
   me  Contact
   rt  *RoutingTable
   lookupResp [][]Contact
-  pingResp []*Contact
+	lookupResponder []Contact
+  pingResp []Contact
   mtx *sync.Mutex
 }
 
@@ -60,8 +61,41 @@ func handleRPC(ch chan []byte, me *Contact, net *Network){
   case "pingresp":
     net.mtx.Lock()
     fmt.Println("I got pingresponse from:", message.GetSenderId(), message.GetSenderAddr())
-    net.pingResp = append(net.pingResp, me)
+		id := NewKademliaID(message.GetSenderId())
+		responder := NewContact(id, message.GetSenderAddr())
+    net.pingResp = append(net.pingResp, responder)
     net.mtx.Unlock()
+
+	case "lookup":
+		net.mtx.Lock()
+		fmt.Println("I got a lookupreq from:", message.GetSenderId(), message.GetSenderAddr())
+		id := NewKademliaID(message.GetLookupId())
+		kclosest := net.rt.FindClosestContacts(id, 20)
+		net.mtx.Unlock()
+		t := ""
+		for i := 0; i < len(kclosest); i++ {
+			t = t + kclosest[i].String() + "\n"
+		}
+		resp := buildMessage([]string{"lookupresp", me.ID.String(), me.Address, message.GetLookupId(), t})
+		sendMessage(message.GetSenderAddr(), resp)
+
+	case: "lookupresp":
+		t := string(message.LookupResp)
+
+		contacts := []Contact{}
+		s := strings.Split(t, "\n")
+
+		for i := 0; i < len(s)-1; i++ {
+			row := strings.Split(s[i], "\"")
+			contacts = append(contacts, NewContact(NewKademliaID(row[1]), row[3]))
+		}
+
+		net.mtx.Lock()
+		net.lookupResp = append(net.lookupResp, [][]Contact{contacts}...)
+		id := NewKademliaID(message.GetSenderId())
+		responder := NewContact(id, message.GetSenderAddr())
+		net.lookupResponder = append(net.lookupResponder, responder)
+		net.mtx.Unlock()
 
 
   default:
@@ -90,6 +124,25 @@ func buildMessage(input []string) *protobuf.Kmessage {
 			Label:     *proto.String(input[0]),
 			SenderId: *proto.String(input[1]),
 			SenderAddr: *proto.String(input[2]),
+		}
+		return message
+	case "lookup":
+		fmt.Println("Building lookup")
+		message := &protobuf.Kmessage{
+			Label:     *proto.String(input[0]),
+			SenderId: *proto.String(input[1]),
+			SenderAddr: *proto.String(input[2]),
+			LookupId: *proto.String(input[3]),
+		}
+		return message
+	case "lookupresp":
+		fmt.Println("Building lookupresp")
+		message := &protobuf.Kmessage{
+			Label:     *proto.String(input[0]),
+			SenderId: *proto.String(input[1]),
+			SenderAddr: *proto.String(input[2]),
+			LookupId: *proto.String(input[3]),
+			LookupResp: *proto.String(input[4]),
 		}
 		return message
 	default:
@@ -167,8 +220,9 @@ func (network *Network) Listen(me Contact) {
 
 
 
-func (network *Network) SendFindContactMessage(contact *Contact) {
-	// TODO
+func (network *Network) SendFindContactMessage(contact *Contact, targetid) {
+	message := buildMessage([]string{"lookup", network.me.ID.String(), network.me.Address, targetid})
+	sendMessage(contact.Address, message)
 }
 
 func (network *Network) SendFindDataMessage(hash string) {
@@ -179,6 +233,7 @@ func (network *Network) SendStoreMessage(data []byte) {
 	// TODO
 }
 
-func (network *Network) refreshRT(resp []Contact) {
+func (network *Network) refreshRT(contact Contact) {
   // should try to refresh rt using contacts from a lookupresponse
+
 }

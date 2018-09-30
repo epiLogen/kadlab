@@ -3,9 +3,10 @@ syntax="proto3";
 package protobuf;
 
 message Kmessage {
-	string label = 1;
-	string senderId = 2;
-	string senderAddr = 3;
+	string Label = 1;
+	string SenderId = 2;
+	string SenderAddr = 3;
+	string LookupId = 4;
 }
 
 // COMPILE
