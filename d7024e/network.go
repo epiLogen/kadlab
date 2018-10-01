@@ -233,7 +233,53 @@ func (network *Network) SendStoreMessage(data []byte) {
 	// TODO
 }
 
-func (network *Network) refreshRT(contact Contact) {
-  // should try to refresh rt using contacts from a lookupresponse
+func (network *Network) RefreshRT(contact Contact) {
+  // find bucket contact should be placed in
+	bucket := network.rt.buckets[network.rt.getBucketIndex(contact.ID)]
 
+	// go through bucket to see if contact already exists
+	var element *list.Element
+	bucket.mtx.Lock()
+	for e := bucket.list.Front(); e != nil; e = e.Next() {
+		nodeID := e.Value.(Contact).ID
+
+		if (contact).ID.Equals(nodeID) {
+			element = e
+		}
+	}
+
+	if element == nil { // contact not in bucket
+
+		if bucket.list.Len() < bucketSize { // bucket not full -> add contact in front
+			bucket.list.PushFront(contact)
+		} else { // bucket is full -> ping oldest contact
+			oldestContact := bucket.list.Back().Value.(Contact)
+			bucket.mtx.Unlock()
+			network.SendPingMessage(&oldestContact)
+
+			time.Sleep(1000 * time.Millisecond) // give 1 sec to respond
+			bucket.mtx.Lock()
+			if !network.inPingResp(&oldestContact) {
+				bucket.RemoveContact(oldestContact)
+				bucket.AddContact(contact)
+			}
+		}
+	} else { // contact is in bucket -> move it to front
+		bucket.list.MoveToFront(element)
+	}
+	bucket.mtx.Unlock()
+
+}
+
+// checks if contact responded to ping, removes the response if so
+func (network *Network) inPingResp(c *Contact) bool {
+	for i := 0; i < len(network.pingResp); i++ {
+		if c.ID.Equals(network.pingResp[i].ID) {
+			network.mtx.Lock()
+			network.pingResp = append(network.pingResp[:i], network.pingResp[i+1:]...)
+			network.mtx.Unlock()
+			return true
+		}
+	}
+	return false
 }
