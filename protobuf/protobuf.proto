@@ -7,6 +7,7 @@ message Kmessage {
 	string SenderId = 2;
 	string SenderAddr = 3;
 	string LookupId = 4;
+	string LookupResp = 5;
 }
 
 // COMPILE

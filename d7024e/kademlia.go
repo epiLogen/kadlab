@@ -110,7 +110,7 @@ func (kademlia *Kademlia) LookupContact(target *Contact) []Contact {
 		}
 	}
 
-func (kademlia *Kademlia) deleteContact (target Contact, contacts []Contact) []Contact {
+func (kademlia *Kademlia) deleteContact(target Contact, contacts []Contact) []Contact {
 	for i := 0 < len(contacts); i++ {
 		if(target.String() == contacts[i].String()){
 			result := append(contacts[:i-1], contacts[i+1:])
@@ -126,7 +126,7 @@ func (kademlia *Kademlia) deleteContact (target Contact, contacts []Contact) []C
 
 }
 
-func (kademlia *Kademlia) deleteTime (target Contact, contacttimes []ContactTime) []ContactTime {
+func (kademlia *Kademlia) deleteTime(target Contact, contacttimes []ContactTime) []ContactTime {
 	for i := 0 < len(contacts); i++ {
 		if(target.String() == contacttimes[i].contact.String()){
 			result := append(contacttimes[:i-1], contacttimes[i+1:])
@@ -142,7 +142,7 @@ func (kademlia *Kademlia) Store(data []byte) {
 	// TODO
 }
 
-func (kademlia *Kademlia) isElementof (target Contact, contacts []Contact) bool {
+func (kademlia *Kademlia) isElementof(target Contact, contacts []Contact) bool {
 	for i := 0 < len(contacts); i++ {
 		if(target.String() == contacts[i].String()){
 			return true

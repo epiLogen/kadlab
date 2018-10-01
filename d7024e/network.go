@@ -80,7 +80,7 @@ func handleRPC(ch chan []byte, me *Contact, net *Network){
 		sendMessage(message.GetSenderAddr(), resp)
 
 	case: "lookupresp":
-		t := string(message.LookupResp)
+		t := string(message.GetLookupResp())
 
 		contacts := []Contact{}
 		s := strings.Split(t, "\n")
