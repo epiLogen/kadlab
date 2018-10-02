@@ -1,31 +1,33 @@
 package d7024e
+
 //Komment
 import (
-	"kadlab/protobuf"
+	"container/list"
 	"fmt"
+	"kadlab/protobuf"
 	"net"
+	"strings"
 	"sync"
 	"time"
+
 	"github.com/golang/protobuf/proto"
-	"container/list"
-	"strings"
 )
 
 type Network struct {
-  me  Contact
-  rt  *RoutingTable
-  lookupResp [][]Contact
+	me              Contact
+	rt              *RoutingTable
+	lookupResp      [][]Contact
 	lookupResponder []Contact
-  pingResp []Contact
-  mtx *sync.Mutex
+	pingResp        []Contact
+	mtx             *sync.Mutex
 }
 
 func NewNetwork(me Contact, rt *RoutingTable) Network {
-  network := Network{}
-  network.me = me
-  network.rt = rt
-  network.mtx = &sync.Mutex{}
-  return network
+	network := Network{}
+	network.me = me
+	network.rt = rt
+	network.mtx = &sync.Mutex{}
+	return network
 }
 
 // type RpcHandler struct {
@@ -40,14 +42,14 @@ func NewNetwork(me Contact, rt *RoutingTable) Network {
 //   return rpc
 // }
 
-func handleRPC(ch chan []byte, me *Contact, net *Network){
-  rawdata := <-ch
-  message := &protobuf.Kmessage{}
+func handleRPC(ch chan []byte, me *Contact, net *Network) {
+	rawdata := <-ch
+	message := &protobuf.Kmessage{}
 
-  err := proto.Unmarshal(rawdata, message)
-  if err != nil {
-    fmt.Println(err)
-  }
+	err := proto.Unmarshal(rawdata, message)
+	if err != nil {
+		fmt.Println(err)
+	}
 
 	//Add new contact to RT if needed
 	newContact := NewContact(NewKademliaID(message.GetSenderId()), message.GetSenderAddr())
@@ -56,25 +58,24 @@ func handleRPC(ch chan []byte, me *Contact, net *Network){
 	}
 	net.RefreshRT(newContact)
 
-  //Ping findnode findvalue store
-  switch message.GetLabel() {
-  case "ping":
-    fmt.Println("Just got pinged omg")
-    fmt.Println("label:", message.GetLabel())
-    fmt.Println("senderID:", message.GetSenderId())
-    fmt.Println("senderAddr:", message.GetSenderAddr())
+	//Ping findnode findvalue store
+	switch message.GetLabel() {
+	case "ping":
+		fmt.Println("Just got pinged omg")
+		fmt.Println("label:", message.GetLabel())
+		fmt.Println("senderID:", message.GetSenderId())
+		fmt.Println("senderAddr:", message.GetSenderAddr())
 
-    resp := buildMessage([]string{"pingresp", me.ID.String(), me.Address})
-    sendMessage(message.GetSenderAddr(), resp)
+		resp := buildMessage([]string{"pingresp", me.ID.String(), me.Address})
+		sendMessage(message.GetSenderAddr(), resp)
 
-
-  case "pingresp":
-    net.mtx.Lock()
-    fmt.Println("I got pingresponse from:", message.GetSenderId(), message.GetSenderAddr())
+	case "pingresp":
+		net.mtx.Lock()
+		fmt.Println("I got pingresponse from:", message.GetSenderId(), message.GetSenderAddr())
 		id := NewKademliaID(message.GetSenderId())
 		responder := NewContact(id, message.GetSenderAddr())
-    net.pingResp = append(net.pingResp, responder)
-    net.mtx.Unlock()
+		net.pingResp = append(net.pingResp, responder)
+		net.mtx.Unlock()
 
 	case "lookup":
 		net.mtx.Lock()
@@ -109,67 +110,80 @@ func handleRPC(ch chan []byte, me *Contact, net *Network){
 		net.lookupResponder = append(net.lookupResponder, responder)
 		net.mtx.Unlock()
 
+	case "lookupdata":
+		// return file if node has it, otherwise return kclosest
 
-  default:
-    fmt.Println("Wrong message")
+	default:
+		fmt.Println("Wrong message")
 		fmt.Println("label:", message.GetLabel())
 		fmt.Println("senderID:", message.GetSenderId())
 		fmt.Println("senderAddr:", message.GetSenderAddr())
-  }
+	}
 
 }
 
 func buildMessage(input []string) *protobuf.Kmessage {
-  switch input[0] {
-  case "ping":
+	switch input[0] {
+	case "ping":
 		fmt.Println("Building Ping")
-    message := &protobuf.Kmessage{
-      Label:     *proto.String(input[0]),
-      SenderId: *proto.String(input[1]),
-      SenderAddr: *proto.String(input[2]),
-    }
-    return message
+		message := &protobuf.Kmessage{
+			Label:      *proto.String(input[0]),
+			SenderId:   *proto.String(input[1]),
+			SenderAddr: *proto.String(input[2]),
+		}
+		return message
 	case "pingresp":
 		fmt.Println("Bulding pingresp")
 		message := &protobuf.Kmessage{
-			Label:     *proto.String(input[0]),
-			SenderId: *proto.String(input[1]),
+			Label:      *proto.String(input[0]),
+			SenderId:   *proto.String(input[1]),
 			SenderAddr: *proto.String(input[2]),
 		}
 		return message
 	case "lookup":
 		fmt.Println("Building lookup")
 		message := &protobuf.Kmessage{
-			Label:     *proto.String(input[0]),
-			SenderId: *proto.String(input[1]),
+			Label:      *proto.String(input[0]),
+			SenderId:   *proto.String(input[1]),
 			SenderAddr: *proto.String(input[2]),
-			LookupId: *proto.String(input[3]),
+			LookupId:   *proto.String(input[3]),
 		}
 		return message
 	case "lookupresp":
 		fmt.Println("Building lookupresp")
 		message := &protobuf.Kmessage{
-			Label:     *proto.String(input[0]),
-			SenderId: *proto.String(input[1]),
+			Label:      *proto.String(input[0]),
+			SenderId:   *proto.String(input[1]),
 			SenderAddr: *proto.String(input[2]),
-			LookupId: *proto.String(input[3]),
+			LookupId:   *proto.String(input[3]),
 			LookupResp: *proto.String(input[4]),
+		}
+		return message
+	case "lookupdata":
+		fmt.Println("Building lookupdata")
+		message := &protobuf.Kmessage{
+			Label:      *proto.String(input[0]),
+			SenderId:   *proto.String(input[1]),
+			SenderAddr: *proto.String(input[2]),
+			LookupId:   *proto.String(input[3]),
+			LookupResp: *proto.String(input[4]),
+			Key:        *proto.String(input[4]),
 		}
 		return message
 	default:
 		fmt.Println("Building Error message")
 		message := &protobuf.Kmessage{
-			Label:     *proto.String("Error"),
-			SenderId: *proto.String(input[1]),
+			Label:      *proto.String("Error"),
+			SenderId:   *proto.String(input[1]),
 			SenderAddr: *proto.String(input[2]),
 		}
 		return message
-  }
+	}
 }
 
 func (network *Network) SendPingMessage(contact *Contact) {
-  message := buildMessage([]string{"ping", network.me.ID.String(), network.me.Address})
-  sendMessage(contact.Address, message)
+	message := buildMessage([]string{"ping", network.me.ID.String(), network.me.Address})
+	sendMessage(contact.Address, message)
 }
 
 func sendMessage(Address string, message *protobuf.Kmessage) {
@@ -193,23 +207,22 @@ func sendMessage(Address string, message *protobuf.Kmessage) {
 
 }
 
-
 func (network *Network) Listen(me Contact) {
-  fmt.Println("Lyssnar")
+	fmt.Println("Lyssnar")
 	Addr, err1 := net.ResolveUDPAddr("udp", me.Address)
 	Conn, err2 := net.ListenUDP("udp", Addr)
-  defer Conn.Close()
+	defer Conn.Close()
 
 	if (err1 != nil) || (err2 != nil) {
 		fmt.Println("Resolve error:", err1)
 		fmt.Println("Listen error:", err2)
 	}
 
-  ch := make(chan []byte)
+	ch := make(chan []byte)
 	buffer := make([]byte, 4096)
 
 	for {
-    time.Sleep(10 * time.Millisecond)
+		time.Sleep(10 * time.Millisecond)
 		fmt.Println(me.Address, "Väntar")
 		n, _, err1 := Conn.ReadFromUDP(buffer)
 
@@ -218,11 +231,10 @@ func (network *Network) Listen(me Contact) {
 		}
 
 		rawdata := buffer[:n]
-    go handleRPC(ch, &me, network)
-    ch <- rawdata
+		go handleRPC(ch, &me, network)
+		ch <- rawdata
 	}
 }
-
 
 //Find node RPC
 func (network *Network) SendFindContactMessage(contact *Contact, targetid *KademliaID) {
@@ -231,10 +243,13 @@ func (network *Network) SendFindContactMessage(contact *Contact, targetid *Kadem
 	message := buildMessage([]string{"lookup", network.me.ID.String(), network.me.Address, targetid.String()})
 	sendMessage(contact.Address, message)
 }
+
 //Find value RPC
-func (network *Network) SendFindDataMessage(hash string) {
-	// TODO
+func (network *Network) SendFindDataMessage(contact *Contact, hash string) {
+	message := buildMessage([]string{"lookupdata", network.me.ID.String(), network.me.Address, "", "", hash})
+	send(contact.Address, message)
 }
+
 //Store RPC
 func (network *Network) SendStoreMessage(data []byte) {
 	// TODO
@@ -245,7 +260,7 @@ func (network *Network) RefreshRT(contact Contact) {
 	if contact.String() == network.me.String() {
 		return
 	}
-  // find bucket contact should be placed in
+	// find bucket contact should be placed in
 	//fmt.Println("Refreshing routing table")
 	bucket := network.rt.buckets[network.rt.getBucketIndex(contact.ID)]
 
