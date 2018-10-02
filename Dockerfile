@@ -7,9 +7,11 @@ RUN apt-get -y upgrade
 
 RUN apt-get install -y \
 net-tools inetutils-traceroute apt-utils \
-iputils-ping xinetd telnetd golang-go
+iputils-ping xinetd telnetd
 
 RUN mkdir /home/go/src/kadlab
-RUN export GOROOT=/home/go/
+ENV GOROOT="/usr/local/go/"
 ADD . /home/go/src/kadlab
 WORKDIR /home/go/src/kadlab/
+
+CMD ["./main"]

@@ -5,42 +5,43 @@ package main
 import (
 	"fmt"
 	kad "kadlab/d7024e"
-	"time"
 	"log"
 	"net"
+	"time"
 )
 
 func main() {
 	//dockermain()
-	mymain()
+	//mymain()
+	time.Sleep(30 * 1000 * time.Millisecond)
+	fmt.Println("hello world")
+	time.Sleep(30 * 1000 * time.Millisecond)
 
 }
 
-func dockermain(){
+func dockermain() {
 	//Fixa IP
 	myIP := GetOutboundIP()
 	fmt.Println(myIP.String() + ":8080")
 
 	//Skapa main kontakt
 	mainID := kad.NewKademliaID("FFFFFFFFFFF11111111111111111111111111005")
-	maincontact := kad.NewContact(mainID,"172.19.0.2:8080")
+	maincontact := kad.NewContact(mainID, "172.19.0.2:8080")
 
 	if myIP.String() == "172.19.0.2" { //Jag är main
 		node := kad.NewKademlia(maincontact)
-		go node.GetNetwork().Listen(maincontact) //Starta main listen
+		go node.GetNetwork().Listen(maincontact)      //Starta main listen
 		node.GetNetwork().GetRT().PrintRoutingTable() //Printa min RT
-	}else{
+	} else {
 		time.Sleep(10 * 1000 * time.Millisecond) //Chilla
 		id1 := kad.NewRandomKademliaID()
 		contact1 := kad.NewContact(id1, myIP.String()+":8080")
 		node1 := kad.NewKademlia(contact1)
-		go node1.GetNetwork().Listen(contact1) //Starta min listen
+		go node1.GetNetwork().Listen(contact1)                               //Starta min listen
 		node1.GetNetwork().SendFindContactMessage(&maincontact, contact1.ID) //Informera main om att jag finns
-		time.Sleep(10 * 1000 * time.Millisecond) //Chilla
-		node1.GetNetwork().GetRT().PrintRoutingTable() //Printa min RT
+		time.Sleep(10 * 1000 * time.Millisecond)                             //Chilla
+		node1.GetNetwork().GetRT().PrintRoutingTable()                       //Printa min RT
 	}
-
-
 
 }
 
@@ -71,17 +72,17 @@ func mymain() {
 
 	fmt.Println("Startar lookup")
 	svar := node1.LookupContact(&contact2)
-	fmt.Printf("Svaret blev","%v\n", svar)
+	fmt.Printf("Svaret blev", "%v\n", svar)
 }
 
 func GetOutboundIP() net.IP {
-    conn, err := net.Dial("udp", "8.8.8.8:80")
-    if err != nil {
-        log.Fatal(err)
-    }
-    defer conn.Close()
+	conn, err := net.Dial("udp", "8.8.8.8:80")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
 
-    localAddr := conn.LocalAddr().(*net.UDPAddr)
+	localAddr := conn.LocalAddr().(*net.UDPAddr)
 
-    return localAddr.IP
+	return localAddr.IP
 }
