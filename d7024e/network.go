@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 	"github.com/golang/protobuf/proto"
+	"container/list"
+	"strings"
 )
 
 type Network struct {
@@ -46,6 +48,14 @@ func handleRPC(ch chan []byte, me *Contact, net *Network){
   if err != nil {
     fmt.Println(err)
   }
+
+	//Add new contact to RT if needed
+	newContact := NewContact(NewKademliaID(message.GetSenderId()), message.GetSenderAddr())
+	if newContact.String() == me.String() {
+		return
+	}
+	net.RefreshRT(newContact)
+
   //Ping findnode findvalue store
   switch message.GetLabel() {
   case "ping":
@@ -79,11 +89,13 @@ func handleRPC(ch chan []byte, me *Contact, net *Network){
 		resp := buildMessage([]string{"lookupresp", me.ID.String(), me.Address, message.GetLookupId(), t})
 		sendMessage(message.GetSenderAddr(), resp)
 
-	case: "lookupresp":
+	case "lookupresp":
+		fmt.Println("I got a lookuprespons from:", message.GetSenderId(), message.GetSenderAddr())
 		t := string(message.GetLookupResp())
 
 		contacts := []Contact{}
 		s := strings.Split(t, "\n")
+		fmt.Println("The response in string is:", s)
 
 		for i := 0; i < len(s)-1; i++ {
 			row := strings.Split(s[i], "\"")
@@ -108,7 +120,6 @@ func handleRPC(ch chan []byte, me *Contact, net *Network){
 }
 
 func buildMessage(input []string) *protobuf.Kmessage {
-	fmt.Println(input[0])
   switch input[0] {
   case "ping":
 		fmt.Println("Building Ping")
@@ -188,7 +199,6 @@ func (network *Network) Listen(me Contact) {
 	Addr, err1 := net.ResolveUDPAddr("udp", me.Address)
 	Conn, err2 := net.ListenUDP("udp", Addr)
   defer Conn.Close()
-	fmt.Println("1")
 
 	if (err1 != nil) || (err2 != nil) {
 		fmt.Println("Resolve error:", err1)
@@ -197,14 +207,11 @@ func (network *Network) Listen(me Contact) {
 
   ch := make(chan []byte)
 	buffer := make([]byte, 4096)
-	fmt.Println("2")
 
 	for {
     time.Sleep(10 * time.Millisecond)
-		fmt.Println("Väntar")
+		fmt.Println(me.Address, "Väntar")
 		n, _, err1 := Conn.ReadFromUDP(buffer)
-
-		fmt.Println("3")
 
 		if err1 != nil {
 			fmt.Println("Read Error:", err1)
@@ -212,29 +219,34 @@ func (network *Network) Listen(me Contact) {
 
 		rawdata := buffer[:n]
     go handleRPC(ch, &me, network)
-		fmt.Println("4")
     ch <- rawdata
-		fmt.Println("5")
 	}
 }
 
 
-
-func (network *Network) SendFindContactMessage(contact *Contact, targetid) {
-	message := buildMessage([]string{"lookup", network.me.ID.String(), network.me.Address, targetid})
+//Find node RPC
+func (network *Network) SendFindContactMessage(contact *Contact, targetid *KademliaID) {
+	network.lookupResp = [][]Contact{}
+	network.lookupResponder = []Contact{}
+	message := buildMessage([]string{"lookup", network.me.ID.String(), network.me.Address, targetid.String()})
 	sendMessage(contact.Address, message)
 }
-
+//Find value RPC
 func (network *Network) SendFindDataMessage(hash string) {
 	// TODO
 }
-
+//Store RPC
 func (network *Network) SendStoreMessage(data []byte) {
 	// TODO
 }
 
 func (network *Network) RefreshRT(contact Contact) {
+	//If me do nothing
+	if contact.String() == network.me.String() {
+		return
+	}
   // find bucket contact should be placed in
+	//fmt.Println("Refreshing routing table")
 	bucket := network.rt.buckets[network.rt.getBucketIndex(contact.ID)]
 
 	// go through bucket to see if contact already exists
@@ -268,6 +280,7 @@ func (network *Network) RefreshRT(contact Contact) {
 		bucket.list.MoveToFront(element)
 	}
 	bucket.mtx.Unlock()
+	//network.rt.PrintRoutingTable()
 
 }
 
@@ -276,7 +289,7 @@ func (network *Network) inPingResp(c *Contact) bool {
 	for i := 0; i < len(network.pingResp); i++ {
 		if c.ID.Equals(network.pingResp[i].ID) {
 			network.mtx.Lock()
-			network.pingResp = append(network.pingResp[:i], network.pingResp[i+1:]...)
+			network.pingResp = append(network.pingResp[:i], network.pingResp[i+1:]...) //Förmodligen indexfel här (Gissning)
 			network.mtx.Unlock()
 			return true
 		}
