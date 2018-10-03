@@ -65,6 +65,7 @@ func (kademlia *Kademlia) LookupContact(target *Contact) []Contact {
 
 		// response received
 		if len(kademlia.net.lookupResp) > 0 && len(kademlia.net.lookupResponder) > 0 {
+			fmt.Println("Jag fick ett svar!!")
 			//fmt.Printf("Fick svar","%v, %v, %v, %v\n", kademlia.net.lookupResp[0], kademlia.net.lookupResponder[0], unresponded, contacttimes, "\n")
 
 			// if reponder missed time
@@ -109,6 +110,7 @@ func (kademlia *Kademlia) LookupContact(target *Contact) []Contact {
 				if currentcon < alpha {            //Om currentcon är mindre än alpha
 					if !isElementof(kclosest[i], contacted) && !isElementof(kclosest[i], unresponded) {  //Om nuvarande element inte kontaktad och inte väntande. Skicka RPC
 						//fmt.Println("Jag ska inte köras, ny go, currentalpha är ", currentcon, len(contacted), len(unresponded))
+						fmt.Println("Jag startar en missing connection")
 						go kademlia.net.SendFindContactMessage(&kclosest[i], target.ID)
 						contacted = append(contacted, kclosest[i])
 						unresponded = append(unresponded, kclosest[i])
@@ -121,11 +123,12 @@ func (kademlia *Kademlia) LookupContact(target *Contact) []Contact {
 
 		//Kolla om nån är sen
 		for i := 0; i<len(contacttimes); i++ {
+			fmt.Println("Kollar times")
 			if time.Now().Sub(contacttimes[i].ct).Nanoseconds() > 5000000000 { //nån är sen
-				fmt.Println("Nån har missat tiden")
 					//lägg till i missed time och minska currentconnections (väntar ej längre på han)
 				missedtime = append(missedtime, contacttimes[i].contact)
 				currentcon = currentcon -1
+				fmt.Println("Nån har missat tiden")
 
 				for j := 0; j < len(kclosest); j++ { // Gå igenom kclosest
 
@@ -145,8 +148,8 @@ func (kademlia *Kademlia) LookupContact(target *Contact) []Contact {
 		//Kolla om det finns nån som inte har blivit kontaktad och inte missat tiden isf fortsätt
 		terminate := true
 		for i := 0; i < len(kclosest); i++ {
-			if !isElementof(kclosest[i], contacted) && !isElementof(kclosest[i], missedtime) {
-				//fmt.Println("Det finns ännu nån att kontakta")
+			if !isElementof(kclosest[i], contacted) || (!isElementof(kclosest[i], missedtime) && isElementof(kclosest[i], unresponded)){
+				fmt.Println("Det finns ännu nån att kontakta")
 				terminate = false
 			}
 		}

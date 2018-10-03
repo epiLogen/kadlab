@@ -11,11 +11,10 @@ import (
 )
 
 func main() {
-	//dockermain()
 	//mymain()
-	time.Sleep(30 * 1000 * time.Millisecond)
+	//time.Sleep(30 * 1000 * time.Millisecond)
 	fmt.Println("hello world")
-	time.Sleep(30 * 1000 * time.Millisecond)
+	dockermain()
 
 }
 
@@ -29,18 +28,33 @@ func dockermain() {
 	maincontact := kad.NewContact(mainID, "172.19.0.2:8080")
 
 	if myIP.String() == "172.19.0.2" { //Jag är main
+		fmt.Println("Jag vet att jag är main")
 		node := kad.NewKademlia(maincontact)
-		go node.GetNetwork().Listen(maincontact)      //Starta main listen
+		time.Sleep(5 * 1000 * time.Millisecond)
+		go node.GetNetwork().Listen(maincontact)
+		time.Sleep(40 * 1000 * time.Millisecond)      //Starta main listen
 		node.GetNetwork().GetRT().PrintRoutingTable() //Printa min RT
+		time.Sleep(40 * 1000 * time.Millisecond)
 	} else {
-		time.Sleep(10 * 1000 * time.Millisecond) //Chilla
+		time.Sleep(30 * 1000 * time.Millisecond) //Chilla
 		id1 := kad.NewRandomKademliaID()
-		contact1 := kad.NewContact(id1, myIP.String()+":8080")
+		contact1 := kad.NewContact(&id1, myIP.String()+":8080")
+		fmt.Println(contact1.String())
 		node1 := kad.NewKademlia(contact1)
 		go node1.GetNetwork().Listen(contact1)                               //Starta min listen
 		node1.GetNetwork().SendFindContactMessage(&maincontact, contact1.ID) //Informera main om att jag finns
-		time.Sleep(10 * 1000 * time.Millisecond)                             //Chilla
-		node1.GetNetwork().GetRT().PrintRoutingTable()                       //Printa min RT
+		time.Sleep(15 * 1000 * time.Millisecond)                             //Chilla
+		node1.GetNetwork().GetRT().PrintRoutingTable()  //Print RT
+		time.Sleep(15 * 1000 * time.Millisecond)
+
+		if myIP.String() == "172.19.0.3" { //Denna nod får göra en lookup hos mainen av mainen och få 20 noder
+			fmt.Println("Startar lookup")
+			svar := node1.LookupContact(&maincontact)
+			fmt.Printf("Svaret blev", "%v\n", svar)
+			node1.GetNetwork().GetRT().PrintRoutingTable()  //Print RT
+		}else{
+			time.Sleep(10 * 1000 * time.Millisecond)
+		}
 	}
 
 }
@@ -52,8 +66,8 @@ func mymain() {
 	id1 := kad.NewRandomKademliaID()
 	id2 := kad.NewRandomKademliaID()
 
-	contact1 := kad.NewContact(id1, "192.168.0.100:8080")
-	contact2 := kad.NewContact(id2, "192.168.0.106:8080")
+	contact1 := kad.NewContact(&id1, "192.168.0.100:8080")
+	contact2 := kad.NewContact(&id2, "192.168.0.106:8080")
 
 	node1 := kad.NewKademlia(contact1)
 	node2 := kad.NewKademlia(contact2)
