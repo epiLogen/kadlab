@@ -45,16 +45,17 @@ func (bucket *bucket) AddContact(contact Contact) {
 //Removes a contact in bucket
 func (bucket *bucket) RemoveContact(contact Contact) {
 	bucket.mtx.Lock()
+	defer bucket.mtx.Unlock()
 	for e := bucket.list.Front(); e != nil; e = e.Next() {
 		nodeID := e.Value.(Contact).ID
 
 		if (contact).ID.Equals(nodeID) {
 			bucket.list.Remove(e)
-			bucket.mtx.Unlock()
+//			bucket.mtx.Unlock()
 			break
 		}
 	}
-	bucket.mtx.Unlock()
+//	bucket.mtx.Unlock()
 }
 
 //Checks if a contact is in bucket
@@ -83,7 +84,7 @@ func (bucket *bucket) GetContactAndCalcDistance(target *KademliaID) []Contact {
 		contact.CalcDistance(target)
 		contacts = append(contacts, contact)
 	}
-	
+
 	bucket.mtx.Unlock()
 	return contacts
 }

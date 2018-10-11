@@ -9,6 +9,7 @@ message Kmessage {
 	string LookupId = 4;
 	string LookupResp = 5;
 	string Key = 6;
+	string Data = 7;
 }
 
 // COMPILE

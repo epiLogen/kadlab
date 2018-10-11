@@ -76,16 +76,9 @@ func (kademlia *Kademlia) LookupContact(target *Contact) []Contact {
 			}
 
 			//Delete from unresponded
+			kademlia.net.mtx.Lock()
 			unresponded = kademlia.deleteContact(kademlia.net.lookupResponder[0], unresponded)
 			contacttimes = kademlia.deleteTime(kademlia.net.lookupResponder[0], contacttimes)
-
-			//Uppdaterar routing table
-			kademlia.net.mtx.Lock()
-			for i := 0; i < len(kademlia.net.lookupResp); i++ {
-				for j := 0; j < len(kademlia.net.lookupResp[i]); j++ {
-					kademlia.net.RefreshRT(kademlia.net.lookupResp[i][j])
-				}
-			}
 
 			//Tar bort responsen och respondern från nätverket
 			if len(kademlia.net.lookupResp) <= 1 {
@@ -124,7 +117,7 @@ func (kademlia *Kademlia) LookupContact(target *Contact) []Contact {
 		//Kolla om nån är sen
 		for i := 0; i<len(contacttimes); i++ {
 			fmt.Println("Kollar times")
-			if time.Now().Sub(contacttimes[i].ct).Nanoseconds() > 5000000000 { //nån är sen
+			if time.Now().Sub(contacttimes[i].ct).Nanoseconds() > 5000000000000 { //nån är sen
 					//lägg till i missed time och minska currentconnections (väntar ej längre på han)
 				missedtime = append(missedtime, contacttimes[i].contact)
 				currentcon = currentcon -1

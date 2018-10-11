@@ -2,7 +2,6 @@ package d7024e
 
 //Komment
 import (
-	"container/list"
 	"fmt"
 	"kadlab/protobuf"
 	"net"
@@ -77,6 +76,7 @@ func handleRPC(ch chan []byte, me *Contact, net *Network) {
 		responder := NewContact(id, message.GetSenderAddr())
 		net.pingResp = append(net.pingResp, responder)
 		net.mtx.Unlock()
+		fmt.Printf("Utskrift av pingresp","%v,\n", net.pingResp, "\n")
 
 	case "lookup":
 		net.mtx.Lock()
@@ -109,6 +109,14 @@ func handleRPC(ch chan []byte, me *Contact, net *Network) {
 		id := NewKademliaID(message.GetSenderId())
 		responder := NewContact(id, message.GetSenderAddr())
 		net.lookupResponder = append(net.lookupResponder, responder)
+
+		//Uppdaterar routing table
+		for i := 0; i < len(net.lookupResp); i++ {
+			for j := 0; j < len(net.lookupResp[i]); j++ {
+				time.Sleep(50 * time.Millisecond)
+				net.RefreshRT(net.lookupResp[i][j])
+			}
+		}
 		net.mtx.Unlock()
 
 	case "lookupdata":
@@ -166,8 +174,7 @@ func buildMessage(input []string) *protobuf.Kmessage {
 			Label:      *proto.String(input[0]),
 			SenderId:   *proto.String(input[1]),
 			SenderAddr: *proto.String(input[2]),
-			LookupId:   *proto.String(input[3]),
-			LookupResp: *proto.String(input[4]),
+			Key:				*proto.String(input[3]),
 		}
 		return message
 	default:
@@ -181,9 +188,25 @@ func buildMessage(input []string) *protobuf.Kmessage {
 	}
 }
 
-func (network *Network) SendPingMessage(contact *Contact) {
+func (network *Network) SendPingMessage(contact *Contact) bool {
+	network.pingResp = []Contact{}
 	message := buildMessage([]string{"ping", network.me.ID.String(), network.me.Address})
 	sendMessage(contact.Address, message)
+
+	fmt.Println("Skickat ping väntar på svar")
+	time.Sleep(time.Second * 2)
+	fmt.Println("Väntat klart")
+	network.mtx.Lock()
+	if network.inPingResp(contact){
+		fmt.Println("Fick svar")
+		network.mtx.Unlock()
+		return true
+	} else {
+		fmt.Println("Fick inte ett svar")
+		network.mtx.Unlock()
+		return false
+	}
+
 }
 
 func sendMessage(Address string, message *protobuf.Kmessage) {
@@ -246,7 +269,7 @@ func (network *Network) SendFindContactMessage(contact *Contact, targetid *Kadem
 
 //Find value RPC
 func (network *Network) SendFindDataMessage(contact *Contact, hash string) {
-	message := buildMessage([]string{"lookupdata", network.me.ID.String(), network.me.Address, "", "", hash})
+	message := buildMessage([]string{"lookupdata", network.me.ID.String(), network.me.Address, hash})
 	sendMessage(contact.Address, message)
 }
 
@@ -260,63 +283,35 @@ func (network *Network) RefreshRT(contact Contact) {
 	if contact.String() == network.me.String() {
 		return
 	}
+
 	// find bucket contact should be placed in
-	//fmt.Println("Refreshing routing table")
 	bucket := network.rt.buckets[network.rt.getBucketIndex(contact.ID)]
 
-	// go through bucket to see if contact already exists
-	var element *list.Element
-	bucket.mtx.Lock()
-	for e := bucket.list.Front(); e != nil; e = e.Next() {
-		nodeID := e.Value.(Contact).ID
-
-		if contact.ID.Equals(nodeID) {
-			fmt.Println("Equals triggad")
-			element = e
-		}
-	}
-
-	if element == nil { // contact not in bucket
-		//fmt.Println("Contact not in bucket")
-
+	if bucket.ContactinBucket(contact) {
+		bucket.AddContact(contact)
+	} else{
 		if bucket.list.Len() < bucketSize { // bucket not full -> add contact in front
-			//fmt.Println("bucket not full -> add contact in front")
-			bucket.list.PushFront(contact)
-		} else { // bucket is full -> ping oldest contact
-			//fmt.Println("bucket is full -> ping oldest contact")
+			bucket.AddContact(contact)
+		} else {
+			fmt.Println("Bucket full")
 			oldestContact := bucket.list.Back().Value.(Contact)
-//
-//			bucket.RemoveContact(oldestContact)
-//			bucket.AddContact(contact)
-//
-			bucket.mtx.Unlock()
-			network.SendPingMessage(&oldestContact)
-
-			time.Sleep(100 * time.Millisecond) // give 1 sec to respond
-			bucket.mtx.Lock()
-			if !network.inPingResp(&oldestContact) {
-				fmt.Println("Han är inte alive")
+			svar := network.SendPingMessage(&oldestContact)
+			if !svar {
+				fmt.Println("Contact DÖD")
 				bucket.RemoveContact(oldestContact)
 				bucket.AddContact(contact)
-			}	else{
-				fmt.Println("Han är alive")
+			} else {
+				fmt.Println("Contact Levande")
 			}
 		}
-	} else { // contact is in bucket -> move it to front
-		//fmt.Println("contact is in bucket -> move it to front")
-		bucket.list.MoveToFront(element)
 	}
-	bucket.mtx.Unlock()
-	//network.rt.PrintRoutingTable()
-
 }
 
 // checks if contact responded to ping, removes the response if so
 func (network *Network) inPingResp(c *Contact) bool {
 	for i := 0; i < len(network.pingResp); i++ {
-		if c.ID.Equals(network.pingResp[i].ID) {
-			network.mtx.Lock()
-			if i == 0 && len(network.pingResp) == 1{
+		if c.String() == network.pingResp[i].String() {
+			if (i == 0) && (len(network.pingResp) == 1){
 				network.pingResp = []Contact{}
 			} else if i == 0 {
 				network.pingResp = network.pingResp[i+1:]
@@ -325,9 +320,9 @@ func (network *Network) inPingResp(c *Contact) bool {
 			} else {
 				network.pingResp = append(network.pingResp[:i-1], network.pingResp[i+1:]...)
 			}
-			network.mtx.Unlock()
 			fmt.Println("Jag har hittat pingen")
 			return true
+		} else{
 		}
 	}
 	return false
