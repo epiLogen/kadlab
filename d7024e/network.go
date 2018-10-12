@@ -19,6 +19,7 @@ type Network struct {
 	lookupResponder []Contact
 	pingResp        []Contact
 	mtx             *sync.Mutex
+	fs              FileSystem
 }
 
 func NewNetwork(me Contact, rt *RoutingTable) Network {
@@ -26,6 +27,7 @@ func NewNetwork(me Contact, rt *RoutingTable) Network {
 	network.me = me
 	network.rt = rt
 	network.mtx = &sync.Mutex{}
+	network.fs = NewFileSystem()
 	return network
 }
 
@@ -76,7 +78,7 @@ func handleRPC(ch chan []byte, me *Contact, net *Network) {
 		responder := NewContact(id, message.GetSenderAddr())
 		net.pingResp = append(net.pingResp, responder)
 		net.mtx.Unlock()
-		fmt.Printf("Utskrift av pingresp","%v,\n", net.pingResp, "\n")
+		fmt.Printf("Utskrift av pingresp", "%v,\n", net.pingResp, "\n")
 
 	case "lookup":
 		net.mtx.Lock()
@@ -174,7 +176,7 @@ func buildMessage(input []string) *protobuf.Kmessage {
 			Label:      *proto.String(input[0]),
 			SenderId:   *proto.String(input[1]),
 			SenderAddr: *proto.String(input[2]),
-			Key:				*proto.String(input[3]),
+			Key:        *proto.String(input[3]),
 		}
 		return message
 	default:
@@ -197,7 +199,7 @@ func (network *Network) SendPingMessage(contact *Contact) bool {
 	time.Sleep(time.Second * 2)
 	fmt.Println("Väntat klart")
 	network.mtx.Lock()
-	if network.inPingResp(contact){
+	if network.inPingResp(contact) {
 		fmt.Println("Fick svar")
 		network.mtx.Unlock()
 		return true
@@ -289,7 +291,7 @@ func (network *Network) RefreshRT(contact Contact) {
 
 	if bucket.ContactinBucket(contact) {
 		bucket.AddContact(contact)
-	} else{
+	} else {
 		if bucket.list.Len() < bucketSize { // bucket not full -> add contact in front
 			bucket.AddContact(contact)
 		} else {
@@ -311,7 +313,7 @@ func (network *Network) RefreshRT(contact Contact) {
 func (network *Network) inPingResp(c *Contact) bool {
 	for i := 0; i < len(network.pingResp); i++ {
 		if c.String() == network.pingResp[i].String() {
-			if (i == 0) && (len(network.pingResp) == 1){
+			if (i == 0) && (len(network.pingResp) == 1) {
 				network.pingResp = []Contact{}
 			} else if i == 0 {
 				network.pingResp = network.pingResp[i+1:]
@@ -322,7 +324,7 @@ func (network *Network) inPingResp(c *Contact) bool {
 			}
 			fmt.Println("Jag har hittat pingen")
 			return true
-		} else{
+		} else {
 		}
 	}
 	return false
