@@ -122,7 +122,30 @@ func handleRPC(ch chan []byte, me *Contact, net *Network) {
 		net.mtx.Unlock()
 
 	case "lookupdata":
-		// return file if node has it, otherwise return kclosest
+		key := NewKademliaID(message.GetKey())
+		file := network.fs.GetFile(key)
+
+		if file == "" { // file not found -> send back kclosest
+			kclosest := network.rt.FindClosestContacts(key, 20)
+
+			s := ""
+			for i := 0; i < len(kclosest); i++ {
+				s = s + kclosest[i].String() + "\n"
+			}
+			response := buildMessage([]string{"lookupresp", me.ID.String(), me.Address, s})
+			send(message.GetSenderAddr(), response)
+		} else { // file found -> send back file
+			response := buildMessage([]string{"lookupdataresp", me.ID.String(), me.Address, file})
+			send(message.GetSenderAddr(), response)
+
+			// remove file if old (only works if not pinned)
+			if network.fs.Expired(key) {
+				network.fs.Delete(key)
+			}
+
+		}
+	case "lookupdataresp":
+		// todo
 
 	default:
 		fmt.Println("Wrong message")
@@ -177,6 +200,15 @@ func buildMessage(input []string) *protobuf.Kmessage {
 			SenderId:   *proto.String(input[1]),
 			SenderAddr: *proto.String(input[2]),
 			Key:        *proto.String(input[3]),
+		}
+		return message
+	case "lookupdataresp":
+		fmt.Println("Building lookupdataresp")
+		message := &protobuf.Kmessage{
+			Label:      *proto.String(input[0]),
+			SenderId:   *proto.String(input[1]),
+			SenderAddr: *proto.String(input[2]),
+			Data:       *proto.String(input[3]),
 		}
 		return message
 	default:
