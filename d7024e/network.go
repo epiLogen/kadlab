@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+//	"crypto/sha1"
 
 	"github.com/golang/protobuf/proto"
 )
@@ -20,6 +21,7 @@ type Network struct {
 	pingResp        []Contact
 	mtx             *sync.Mutex
 	fs              FileSystem
+	data 						string
 }
 
 func NewNetwork(me Contact, rt *RoutingTable) Network {
@@ -28,6 +30,7 @@ func NewNetwork(me Contact, rt *RoutingTable) Network {
 	network.rt = rt
 	network.mtx = &sync.Mutex{}
 	network.fs = NewFileSystem()
+	network.data = ""
 	return network
 }
 
@@ -115,7 +118,7 @@ func handleRPC(ch chan []byte, me *Contact, net *Network) {
 		//Uppdaterar routing table
 		for i := 0; i < len(net.lookupResp); i++ {
 			for j := 0; j < len(net.lookupResp[i]); j++ {
-				time.Sleep(50 * time.Millisecond)
+				//time.Sleep(50 * time.Millisecond) //Denna orsakade indexerror?
 				net.RefreshRT(net.lookupResp[i][j])
 			}
 		}
@@ -123,29 +126,60 @@ func handleRPC(ch chan []byte, me *Contact, net *Network) {
 
 	case "lookupdata":
 		key := NewKademliaID(message.GetKey())
-		file := network.fs.GetFile(key)
+		file := net.fs.GetFile(key)
 
 		if file == "" { // file not found -> send back kclosest
-			kclosest := network.rt.FindClosestContacts(key, 20)
+			fmt.Println("File not found")
+			kclosest := net.rt.FindClosestContacts(key, 20)
 
 			s := ""
 			for i := 0; i < len(kclosest); i++ {
 				s = s + kclosest[i].String() + "\n"
 			}
-			response := buildMessage([]string{"lookupresp", me.ID.String(), me.Address, s})
-			send(message.GetSenderAddr(), response)
+			response := buildMessage([]string{"lookupresp", me.ID.String(), me.Address, key.String(), s})
+			sendMessage(message.GetSenderAddr(), response)
 		} else { // file found -> send back file
+			fmt.Println("File found")
 			response := buildMessage([]string{"lookupdataresp", me.ID.String(), me.Address, file})
-			send(message.GetSenderAddr(), response)
+			sendMessage(message.GetSenderAddr(), response)
 
 			// remove file if old (only works if not pinned)
-			if network.fs.Expired(key) {
-				network.fs.Delete(key)
-			}
+//			if net.fs.Expired(key) {
+	//			net.fs.Delete(key)
+		//	}
 
 		}
 	case "lookupdataresp":
-		// todo
+		net.mtx.Lock()
+		net.data = string(message.Data)
+		net.mtx.Unlock()
+
+	case "store":
+		//hash := []byte(message.GetData())
+		//key := KademliaID(sha1.Sum(hash))
+
+		key := NewKademliaID(message.GetKey())	//Provar regen
+		file := message.GetData()
+		publisher := message.GetSenderId()
+		net.fs.Store(key, file, publisher)
+		time.Sleep(50 * time.Millisecond)
+
+	case "pin":
+		key := NewKademliaID(message.GetKey())
+		file := net.fs.GetFile(key)
+
+		if file != "" {
+			net.fs.Pin(key)
+		}
+
+	case "unpin":
+		key := NewKademliaID(message.GetKey())
+		file := net.fs.GetFile(key)
+
+		if file != "" {
+			net.fs.Unpin(key)
+		}
+
 
 	default:
 		fmt.Println("Wrong message")
@@ -211,6 +245,36 @@ func buildMessage(input []string) *protobuf.Kmessage {
 			Data:       *proto.String(input[3]),
 		}
 		return message
+	case "store":
+		fmt.Println("Building store")
+		message := &protobuf.Kmessage{
+			Label:      *proto.String(input[0]),
+			SenderId:   *proto.String(input[1]),
+			SenderAddr: *proto.String(input[2]),
+			Key:        *proto.String(input[3]),
+			Data:       *proto.String(input[4]),
+		}
+		return message
+
+	case "pin":
+		fmt.Println("Building pin")
+		message := &protobuf.Kmessage{
+			Label:      *proto.String(input[0]),
+			SenderId:   *proto.String(input[1]),
+			SenderAddr: *proto.String(input[2]),
+			Key:        *proto.String(input[3]),
+		}
+		return message
+	case "unpin":
+		fmt.Println("Building unpin")
+		message := &protobuf.Kmessage{
+			Label:      *proto.String(input[0]),
+			SenderId:   *proto.String(input[1]),
+			SenderAddr: *proto.String(input[2]),
+			Key:        *proto.String(input[3]),
+		}
+		return message
+
 	default:
 		fmt.Println("Building Error message")
 		message := &protobuf.Kmessage{
@@ -303,13 +367,27 @@ func (network *Network) SendFindContactMessage(contact *Contact, targetid *Kadem
 
 //Find value RPC
 func (network *Network) SendFindDataMessage(contact *Contact, hash string) {
+	network.data = ""
+	network.lookupResp = [][]Contact{}
+	network.lookupResponder = []Contact{}
 	message := buildMessage([]string{"lookupdata", network.me.ID.String(), network.me.Address, hash})
 	sendMessage(contact.Address, message)
 }
 
+func (network *Network) SendPinMessage(contact *Contact, key string) {
+	message := buildMessage([]string{"pin", network.me.ID.String(), network.me.Address, key})
+	sendMessage(contact.Address, message)
+}
+
+func (network *Network) SendUnPinMessage(contact *Contact, key string) {
+	message := buildMessage([]string{"unpin", network.me.ID.String(), network.me.Address, key})
+	sendMessage(contact.Address, message)
+}
+
 //Store RPC
-func (network *Network) SendStoreMessage(data []byte) {
-	// TODO
+func (network *Network) SendStoreMessage(contact *Contact, key string, data string) {
+	message := buildMessage([]string{"store", network.me.ID.String(), network.me.Address, key, data})
+	sendMessage(contact.Address, message)
 }
 
 func (network *Network) RefreshRT(contact Contact) {
