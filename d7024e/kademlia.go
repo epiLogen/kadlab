@@ -209,9 +209,9 @@ func (kademlia *Kademlia) LookupContact(target *Contact) []Contact {
 		//If I have the file return it
 		hashb := []byte(hash)
 		key := KademliaID(sha1.Sum(hashb))
-		if kademlia.net.fs.GetFile(&key) != ""{
+		if kademlia.net.fs.GetFile(key) != ""{
 			fmt.Println("LookupData: I have the file")
-			return kademlia.net.fs.GetFile(&key)
+			return kademlia.net.fs.GetFile(key)
 		}
 
 

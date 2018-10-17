@@ -23,6 +23,17 @@ func NewKademliaID(data string) *KademliaID {
 
 	return &newKademliaID
 }
+//nopointer version
+func NewKademliaIDnp(data string) KademliaID {
+	decoded, _ := hex.DecodeString(data)
+
+	newKademliaID := KademliaID{}
+	for i := 0; i < len(decoded); i++ {
+		newKademliaID[i] = decoded[i]
+	}
+
+	return newKademliaID
+}
 
 // NewRandomKademliaID returns a new instance of a random KademliaID,
 // change this to a better version if you like

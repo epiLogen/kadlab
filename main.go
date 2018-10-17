@@ -44,7 +44,7 @@ func dockermain() {
 	hash := []byte(storedata)
 	key := kad.KademliaID(sha1.Sum(hash))
 	strang := key.String()
-	key2 := kad.NewKademliaID(strang)
+	key2 := kad.NewKademliaIDnp(strang)
 	//key2 := NewKademliaID(key.String())
 	fmt.Println("Key 1 is", key.String())
 	time.Sleep(5 * 1000 * time.Millisecond)
@@ -69,7 +69,7 @@ func dockermain() {
 		hash2 := []byte(storedata2)
 		key3 := kad.KademliaID(sha1.Sum(hash2))
 		strang2 := key3.String()
-		key4 := kad.NewKademliaID(strang2)
+		key4 := kad.NewKademliaIDnp(strang2)
 		fs.Store(key4, storedata2, mainID.String())
 		time.Sleep(10 * 1000 * time.Millisecond)
 

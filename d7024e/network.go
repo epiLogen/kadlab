@@ -8,7 +8,7 @@ import (
 	"strings"
 	"sync"
 	"time"
-//	"crypto/sha1"
+	"crypto/sha1"
 
 	"github.com/golang/protobuf/proto"
 )
@@ -125,12 +125,12 @@ func handleRPC(ch chan []byte, me *Contact, net *Network) {
 		net.mtx.Unlock()
 
 	case "lookupdata":
-		key := NewKademliaID(message.GetKey())
+		key := NewKademliaIDnp(message.GetKey())
 		file := net.fs.GetFile(key)
 
 		if file == "" { // file not found -> send back kclosest
 			fmt.Println("File not found")
-			kclosest := net.rt.FindClosestContacts(key, 20)
+			kclosest := net.rt.FindClosestContacts(&key, 20)
 
 			s := ""
 			for i := 0; i < len(kclosest); i++ {
@@ -155,17 +155,17 @@ func handleRPC(ch chan []byte, me *Contact, net *Network) {
 		net.mtx.Unlock()
 
 	case "store":
-		//hash := []byte(message.GetData())
-		//key := KademliaID(sha1.Sum(hash))
+		hash := []byte(message.GetData())
+		key := KademliaID(sha1.Sum(hash))
 
-		key := NewKademliaID(message.GetKey())	//Provar regen
+		//key := NewKademliaID(message.GetKey())	//Provar regen
 		file := message.GetData()
 		publisher := message.GetSenderId()
 		net.fs.Store(key, file, publisher)
 		time.Sleep(50 * time.Millisecond)
 
 	case "pin":
-		key := NewKademliaID(message.GetKey())
+		key := NewKademliaIDnp(message.GetKey())
 		file := net.fs.GetFile(key)
 
 		if file != "" {
@@ -173,7 +173,7 @@ func handleRPC(ch chan []byte, me *Contact, net *Network) {
 		}
 
 	case "unpin":
-		key := NewKademliaID(message.GetKey())
+		key := NewKademliaIDnp(message.GetKey())
 		file := net.fs.GetFile(key)
 
 		if file != "" {
