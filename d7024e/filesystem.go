@@ -7,10 +7,6 @@ import (
 )
 
 type FileSystem struct {
-//	publishers map[*KademliaID]string
-//	data       map[*KademliaID]string
-//	times      map[*KademliaID]time.Time
-//	pin        map[*KademliaID]bool
 	files 		[]File
 	mtx        *sync.Mutex
 }
@@ -26,31 +22,13 @@ type File struct {
 func NewFileSystem() FileSystem {
 	var fs FileSystem
 	fs.files = []File{}
-//	fs.publishers = make(map[*KademliaID]string)
-//	fs.data = make(map[*KademliaID]string)
-//	fs.times = make(map[*KademliaID]time.Time)
-//	fs.pin = make(map[*KademliaID]bool)
 	fs.mtx = &sync.Mutex{}
 	return fs
 }
 
-// func NewFile() File {
-// 	var f File
-// 	return fs
-// }
-
 func (fs *FileSystem) Store(key KademliaID, file string, publisher string) {
 	fs.mtx.Lock()
 
-	// fs.publishers[key] = publisher
-	// fs.data[key] = file
-	// fs.times[key] = time.Now()
-	// fs.pin[key] = false
-
-	// pos := len (fs.files) -1
-	// if len (fs.files) == 0 {
-	// 	pos = 0
-	// }
 	filen := File{}
 	filen.publisher = publisher
 	filen.data = file
@@ -80,8 +58,6 @@ func (fs *FileSystem) GetPos(key KademliaID) int {
 
 func (fs *FileSystem) GetFile(key KademliaID) string {
 	fs.mtx.Lock()
-//	size := len(fs.data)
-//	svar := fs.data[key]
 
 	svar := ""
 	pos := fs.GetPos(key)
@@ -92,11 +68,6 @@ func (fs *FileSystem) GetFile(key KademliaID) string {
 
 	fmt.Println("Getfile called size is, key is, svar is", len(fs.files), key.String(), svar)
 
-	//Print map
-	// fmt.Println("GPrinting map")
-	// for k, v := range fs.data {
-  //   fmt.Printf("key[%s] value[%s]\n", k, v)
-	// }
 	return svar
 }
 
