@@ -45,7 +45,6 @@ func dockermain() {
 	key := kad.KademliaID(sha1.Sum(hash))
 	strang := key.String()
 	key2 := kad.NewKademliaIDnp(strang)
-	//key2 := NewKademliaID(key.String())
 	fmt.Println("Key 1 is", key.String())
 	time.Sleep(5 * 1000 * time.Millisecond)
 
@@ -64,20 +63,7 @@ func dockermain() {
 		file := fs.GetFile(key2)
 		fmt.Println("Filen är",file)
 
-		time.Sleep(5 * 1000 * time.Millisecond)
-		storedata2 := "hejsan123"
-		hash2 := []byte(storedata2)
-		key3 := kad.KademliaID(sha1.Sum(hash2))
-		strang2 := key3.String()
-		key4 := kad.NewKademliaIDnp(strang2)
-		fs.Store(key4, storedata2, mainID.String())
-		time.Sleep(10 * 1000 * time.Millisecond)
-
-		file2 := fs.GetFile(key4)
-		fmt.Println("Filen är",file2)
-
-		file = fs.GetFile(key2)
-		fmt.Println("Filen är",file)
+	  time.Sleep(5 * 1000 * time.Millisecond)
 
 	} else {
 		time.Sleep(15 * 1000 * time.Millisecond) //Chilla
@@ -100,16 +86,15 @@ func dockermain() {
 			//Vänta 2 min
 			time.Sleep(2 * 60 * 1000 * time.Millisecond)
 
-			//fmt.Println("Gör en lookup med key", key.String())
-			//lookupsvar := node1.LookupData(key.String())
+			fmt.Println("Gör en lookup med key", key.String())
+			lookupsvar := node1.LookupData(key.String())
 
 			time.Sleep(5* 1000 * time.Millisecond)
-			//fmt.Println(lookupsvar)
+			fmt.Println(lookupsvar)
 		} else {
 			time.Sleep(5 * 60 * 1000 * time.Millisecond)
 		}
 
-		//Store
 		// if myIP.String() == "172.19.0.3" { //Denna nod får göra en lookup hos mainen av mainen och få 20 noder
 		// 	fmt.Println("Startar lookup")
 		// 	data := "Hello World 123"

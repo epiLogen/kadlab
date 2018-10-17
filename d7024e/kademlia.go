@@ -240,7 +240,7 @@ func (kademlia *Kademlia) LookupContact(target *Contact) []Contact {
 
 		// keep contacting unqueried nodes after response/timeout
 		for {
-			time.Sleep(500 * time.Millisecond)
+			time.Sleep(100 * time.Millisecond)
 
 			// response received
 			if kademlia.net.data != "" { //File found
@@ -287,13 +287,17 @@ func (kademlia *Kademlia) LookupContact(target *Contact) []Contact {
 							unresponded = append(unresponded, kclosest[i])
 							contacttimes = append(contacttimes, ContactTime{kclosest[i], time.Now()})
 							currentcon = currentcon + 1
+							time.Sleep(100 * time.Millisecond)
 						}
 					}
 				}
+			}	else{
+				time.Sleep(250 * time.Millisecond)
 			}
+			time.Sleep(250 * time.Millisecond)
 
 			for i := 0; i<len(contacttimes); i++ {
-				if time.Now().Sub(contacttimes[i].ct).Nanoseconds() > 5000000000000 {
+				if time.Now().Sub(contacttimes[i].ct).Nanoseconds() > 5000000000 {
 					missedtime = append(missedtime, contacttimes[i].contact)
 					currentcon = currentcon -1
 
