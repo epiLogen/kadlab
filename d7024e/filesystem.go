@@ -29,20 +29,39 @@ func NewFileSystem() FileSystem {
 func (fs *FileSystem) Store(key KademliaID, file string, publisher string) {
 	fs.mtx.Lock()
 
-	filen := File{}
-	filen.publisher = publisher
-	filen.data = file
-	filen.key = key
-	filen.time = time.Now()
-	filen.pin = false
-	fs.files = append(fs.files, filen)
+	pos := fs.GetPos(key)
+	if pos != -1 {
+		fs.files[pos].time = time.Now()
+		fmt.Println("Republish registered")
+	} else {
+		filen := File{}
+		filen.publisher = publisher
+		filen.data = file
+		filen.key = key
+		filen.time = time.Now()
+		filen.pin = false
+		fs.files = append(fs.files, filen)
+		fmt.Println("Store registered")
+	}
 
 	fs.mtx.Unlock()
 
-	fmt.Println("File stored")
-	file = fs.GetFile(key)
-	fmt.Println("File is", file)
+	//file = fs.GetFile(key)
 
+}
+
+func (fs *FileSystem) GetRepublish(republishmin int) []File {
+	fmt.Println("Getrepublish initierad")
+	svar := []File{}
+	now := time.Now()
+	for i := 0; i < len(fs.files); i++ {
+		fmt.Println("File diff time and comptime",now.Sub(fs.files[i].time), "Separering", time.Minute*time.Duration(republishmin-2))
+		if now.Sub(fs.files[i].time) > time.Minute*time.Duration(republishmin-1) {
+			svar = append(svar, fs.files[i])
+		}
+	}
+	fmt.Println("Längden på svaret är", len(svar))
+	return svar
 }
 
 //returns the position of the searched file. Called with locked mutex

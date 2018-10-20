@@ -43,8 +43,8 @@ func dockermain() {
 	storedata := "Hello World 123"
 	hash := []byte(storedata)
 	key := kad.KademliaID(sha1.Sum(hash))
-	strang := key.String()
-	key2 := kad.NewKademliaIDnp(strang)
+	//strang := key.String()
+	//key2 := kad.NewKademliaIDnp(strang)
 	fmt.Println("Key 1 is", key.String())
 	time.Sleep(5 * 1000 * time.Millisecond)
 
@@ -54,16 +54,16 @@ func dockermain() {
 		time.Sleep(5 * 1000 * time.Millisecond)
 		go node.GetNetwork().Listen(maincontact)
 		time.Sleep(30 * 1000 * time.Millisecond)      //Starta main listen
-		node.GetNetwork().GetRT().PrintRoutingTable() //Printa min RT
+		//node.GetNetwork().GetRT().PrintRoutingTable() //Printa min RT
 		time.Sleep(30 * 1000 * time.Millisecond)
 		time.Sleep(2*60 * 1000 * time.Millisecond)
 
 		//Kolla om jag har filen
-		fs := node.GetNetwork().GetFS()
-		file := fs.GetFile(key2)
-		fmt.Println("Filen är",file)
+		// fs := node.GetNetwork().GetFS()
+		// file := fs.GetFile(key2)
+		// fmt.Println("Filen är",file)
 
-	  time.Sleep(5 * 1000 * time.Millisecond)
+	  time.Sleep(20 * 60 * 1000 * time.Millisecond)
 
 	} else {
 		time.Sleep(15 * 1000 * time.Millisecond) //Chilla
@@ -76,7 +76,7 @@ func dockermain() {
 		time.Sleep(time.Duration(rand) * 1000 * time.Millisecond)
 		node1.GetNetwork().SendFindContactMessage(&maincontact, contact1.ID) //Informera main om att jag finns
 		time.Sleep(30 * 1000 * time.Millisecond)                             //Chilla
-		node1.GetNetwork().GetRT().PrintRoutingTable()  //Print RT
+		//node1.GetNetwork().GetRT().PrintRoutingTable()  //Print RT
 		time.Sleep(30 * 1000 * time.Millisecond)
 
 		if myIP.String() == "172.19.0.3" {
@@ -84,15 +84,19 @@ func dockermain() {
 			node1.Store(storedata)
 			fmt.Println("Storen är avslutad")
 			//Vänta 2 min
+			time.Sleep(1 * 60 * 1000 * time.Millisecond)
+
+//			fmt.Println("Gör en lookup med key", key.String())
+//			lookupsvar := node1.LookupData(key.String())
+//			fmt.Println("Gör en pin med key", key.String())
+//			node1.Pin(key)
 			time.Sleep(2 * 60 * 1000 * time.Millisecond)
+//			node1.UnPin(key)
 
-			fmt.Println("Gör en lookup med key", key.String())
-			lookupsvar := node1.LookupData(key.String())
-
-			time.Sleep(5* 1000 * time.Millisecond)
-			fmt.Println(lookupsvar)
+			time.Sleep(20* 60*1000 * time.Millisecond)
+			//fmt.Println(lookupsvar)
 		} else {
-			time.Sleep(5 * 60 * 1000 * time.Millisecond)
+			time.Sleep(20 * 60 * 1000 * time.Millisecond)
 		}
 
 		// if myIP.String() == "172.19.0.3" { //Denna nod får göra en lookup hos mainen av mainen och få 20 noder

@@ -66,26 +66,26 @@ func handleRPC(ch chan []byte, me *Contact, net *Network) {
 	//Ping findnode findvalue store
 	switch message.GetLabel() {
 	case "ping":
-		fmt.Println("Just got pinged omg")
-		fmt.Println("label:", message.GetLabel())
-		fmt.Println("senderID:", message.GetSenderId())
-		fmt.Println("senderAddr:", message.GetSenderAddr())
+		// fmt.Println("Just got pinged omg")
+		// fmt.Println("label:", message.GetLabel())
+		// fmt.Println("senderID:", message.GetSenderId())
+		// fmt.Println("senderAddr:", message.GetSenderAddr())
 
 		resp := buildMessage([]string{"pingresp", me.ID.String(), me.Address})
 		sendMessage(message.GetSenderAddr(), resp)
 
 	case "pingresp":
 		net.mtx.Lock()
-		fmt.Println("I got pingresponse from:", message.GetSenderId(), message.GetSenderAddr())
+		//fmt.Println("I got pingresponse from:", message.GetSenderId(), message.GetSenderAddr())
 		id := NewKademliaID(message.GetSenderId())
 		responder := NewContact(id, message.GetSenderAddr())
 		net.pingResp = append(net.pingResp, responder)
 		net.mtx.Unlock()
-		fmt.Printf("Utskrift av pingresp", "%v,\n", net.pingResp, "\n")
+		//fmt.Printf("Utskrift av pingresp", "%v,\n", net.pingResp, "\n")
 
 	case "lookup":
 		net.mtx.Lock()
-		fmt.Println("I got a lookupreq from:", message.GetSenderId(), message.GetSenderAddr())
+		//fmt.Println("I got a lookupreq from:", message.GetSenderId(), message.GetSenderAddr())
 		id := NewKademliaID(message.GetLookupId())
 		kclosest := net.rt.FindClosestContacts(id, 20)
 		net.mtx.Unlock()
@@ -97,19 +97,19 @@ func handleRPC(ch chan []byte, me *Contact, net *Network) {
 		sendMessage(message.GetSenderAddr(), resp)
 
 	case "lookupresp":
-		fmt.Println("I got a lookuprespons from:", message.GetSenderId(), message.GetSenderAddr())
+		//fmt.Println("I got a lookuprespons from:", message.GetSenderId(), message.GetSenderAddr())
+		net.mtx.Lock()
 		t := string(message.GetLookupResp())
 
 		contacts := []Contact{}
 		s := strings.Split(t, "\n")
-		fmt.Println("The response in string is:", s)
+		//fmt.Println("The response in string is:", s)
 
 		for i := 0; i < len(s)-1; i++ {
 			row := strings.Split(s[i], "\"")
 			contacts = append(contacts, NewContact(NewKademliaID(row[1]), row[3]))
 		}
 
-		net.mtx.Lock()
 		net.lookupResp = append(net.lookupResp, [][]Contact{contacts}...)
 		id := NewKademliaID(message.GetSenderId())
 		responder := NewContact(id, message.GetSenderAddr())
@@ -117,10 +117,11 @@ func handleRPC(ch chan []byte, me *Contact, net *Network) {
 
 		//Uppdaterar routing table
 		for i := 0; i < len(net.lookupResp); i++ {
-			for j := 0; j < len(net.lookupResp[i]); j++ {
-				//time.Sleep(50 * time.Millisecond) //Denna orsakade indexerror?
-				net.RefreshRT(net.lookupResp[i][j])
-			}
+				for j := 0; j < len(net.lookupResp[i]); j++ {
+					//time.Sleep(1 * time.Millisecond) //Denna orsakade indexerror?
+					net.RefreshRT(net.lookupResp[i][j])
+				}
+			//time.Sleep(1 * time.Millisecond)
 		}
 		net.mtx.Unlock()
 
@@ -193,7 +194,7 @@ func handleRPC(ch chan []byte, me *Contact, net *Network) {
 func buildMessage(input []string) *protobuf.Kmessage {
 	switch input[0] {
 	case "ping":
-		fmt.Println("Building Ping")
+		//fmt.Println("Building Ping")
 		message := &protobuf.Kmessage{
 			Label:      *proto.String(input[0]),
 			SenderId:   *proto.String(input[1]),
@@ -201,7 +202,7 @@ func buildMessage(input []string) *protobuf.Kmessage {
 		}
 		return message
 	case "pingresp":
-		fmt.Println("Bulding pingresp")
+		//fmt.Println("Bulding pingresp")
 		message := &protobuf.Kmessage{
 			Label:      *proto.String(input[0]),
 			SenderId:   *proto.String(input[1]),
@@ -209,7 +210,7 @@ func buildMessage(input []string) *protobuf.Kmessage {
 		}
 		return message
 	case "lookup":
-		fmt.Println("Building lookup")
+		//fmt.Println("Building lookup")
 		message := &protobuf.Kmessage{
 			Label:      *proto.String(input[0]),
 			SenderId:   *proto.String(input[1]),
@@ -218,7 +219,7 @@ func buildMessage(input []string) *protobuf.Kmessage {
 		}
 		return message
 	case "lookupresp":
-		fmt.Println("Building lookupresp")
+		//fmt.Println("Building lookupresp")
 		message := &protobuf.Kmessage{
 			Label:      *proto.String(input[0]),
 			SenderId:   *proto.String(input[1]),
@@ -291,16 +292,16 @@ func (network *Network) SendPingMessage(contact *Contact) bool {
 	message := buildMessage([]string{"ping", network.me.ID.String(), network.me.Address})
 	sendMessage(contact.Address, message)
 
-	fmt.Println("Skickat ping väntar på svar")
+	//fmt.Println("Skickat ping väntar på svar")
 	time.Sleep(time.Second * 2)
-	fmt.Println("Väntat klart")
+	//fmt.Println("Väntat klart")
 	network.mtx.Lock()
 	if network.inPingResp(contact) {
-		fmt.Println("Fick svar")
+		//fmt.Println("Fick svar")
 		network.mtx.Unlock()
 		return true
 	} else {
-		fmt.Println("Fick inte ett svar")
+		//fmt.Println("Fick inte ett svar")
 		network.mtx.Unlock()
 		return false
 	}
@@ -344,7 +345,7 @@ func (network *Network) Listen(me Contact) {
 
 	for {
 		time.Sleep(10 * time.Millisecond)
-		fmt.Println(me.Address, "Väntar")
+		//fmt.Println(me.Address, "Väntar")
 		n, _, err1 := Conn.ReadFromUDP(buffer)
 
 		if err1 != nil {
@@ -405,15 +406,15 @@ func (network *Network) RefreshRT(contact Contact) {
 		if bucket.list.Len() < bucketSize { // bucket not full -> add contact in front
 			bucket.AddContact(contact)
 		} else {
-			fmt.Println("Bucket full")
+			//fmt.Println("Bucket full")
 			oldestContact := bucket.list.Back().Value.(Contact)
 			svar := network.SendPingMessage(&oldestContact)
 			if !svar {
-				fmt.Println("Contact DÖD")
+				//fmt.Println("Contact DÖD")
 				bucket.RemoveContact(oldestContact)
 				bucket.AddContact(contact)
 			} else {
-				fmt.Println("Contact Levande")
+				//fmt.Println("Contact Levande")
 			}
 		}
 	}
@@ -432,7 +433,7 @@ func (network *Network) inPingResp(c *Contact) bool {
 			} else {
 				network.pingResp = append(network.pingResp[:i-1], network.pingResp[i+1:]...)
 			}
-			fmt.Println("Jag har hittat pingen")
+			//fmt.Println("Jag har hittat pingen")
 			return true
 		} else {
 		}
