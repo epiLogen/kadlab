@@ -115,12 +115,45 @@ func handleRPC(ch chan []byte, me *Contact, net *Network) {
 		responder := NewContact(id, message.GetSenderAddr())
 		net.lookupResponder = append(net.lookupResponder, responder)
 
-		//Uppdaterar routing table
+		//Uppdaterar routing table ebola bugfix
 		for i := 0; i < len(net.lookupResp); i++ {
-				for j := 0; j < len(net.lookupResp[i]); j++ {
-					//time.Sleep(1 * time.Millisecond) //Denna orsakade indexerror?
-					net.RefreshRT(net.lookupResp[i][j])
+			if i < 0 {
+				break
+			}
+			if net.lookupResp != nil {
+				if net.lookupResp[i] != nil {
+					if len(net.lookupResp[i]) != 0 {
+						if i > len(net.lookupResp) -1 {
+							fmt.Println("Index gick out of range")
+							i = len(net.lookupResp) -2
+							if i < 0 {
+								fmt.Println("Index blev under 0")
+								i = 0
+								break
+							}
+						}
+						if i < 0 {
+							fmt.Println("Index blev under 0")
+							i = 0
+							break
+						}
+						for j := 0; j < len(net.lookupResp[i]); j++ {
+							//time.Sleep(1 * time.Millisecond) //Denna orsakade indexerror?
+							net.RefreshRT(net.lookupResp[i][j])
+
+							if i > len(net.lookupResp) -1 {
+								fmt.Println("Index gick out of range innre", len(net.lookupResp))
+								i = len(net.lookupResp) -2
+								if i < 0 {
+									fmt.Println("Index blev under 0 innre")
+									i = -5
+									break
+								}
+							}
+						}
+					}
 				}
+			}
 			//time.Sleep(1 * time.Millisecond)
 		}
 		net.mtx.Unlock()

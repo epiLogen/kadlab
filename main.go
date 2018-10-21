@@ -63,7 +63,7 @@ func dockermain() {
 		// file := fs.GetFile(key2)
 		// fmt.Println("Filen är",file)
 
-	  time.Sleep(20 * 60 * 1000 * time.Millisecond)
+	  time.Sleep(2000 * 60 * 1000 * time.Millisecond)
 
 	} else {
 		time.Sleep(15 * 1000 * time.Millisecond) //Chilla
@@ -93,10 +93,10 @@ func dockermain() {
 			time.Sleep(2 * 60 * 1000 * time.Millisecond)
 //			node1.UnPin(key)
 
-			time.Sleep(20* 60*1000 * time.Millisecond)
+			time.Sleep(2000* 60*1000 * time.Millisecond)
 			//fmt.Println(lookupsvar)
 		} else {
-			time.Sleep(20 * 60 * 1000 * time.Millisecond)
+			time.Sleep(2000 * 60 * 1000 * time.Millisecond)
 		}
 
 		// if myIP.String() == "172.19.0.3" { //Denna nod får göra en lookup hos mainen av mainen och få 20 noder

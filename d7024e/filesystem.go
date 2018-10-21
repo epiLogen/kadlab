@@ -101,32 +101,30 @@ func (fs *FileSystem) GetPublisher(key KademliaID) string {
 	return svar
 }
 
-func (fs *FileSystem) Expired(key KademliaID) bool {
-	fs.mtx.Lock()
-
+func (fs *FileSystem) Expired(key KademliaID) bool { //Kallas med låst mtx
+	fmt.Println("Expired started")
 	timen := time.Now()
 	pos := fs.GetPos(key)
 	if pos != -1 {
+		fmt.Println("file exists")
 		timen = fs.files[pos].time
 	}
-
-	fs.mtx.Unlock()
-
 	now := time.Now()
 	age := now.Sub(timen)
-	return age > time.Hour*24
+	fmt.Println("age is", age)
+	if age > time.Minute*6 {
+		return true
+	} else {
+		return false
+	}
 }
 
 func (fs *FileSystem) Pinned(key KademliaID) bool {
-	fs.mtx.Lock()
-
 	svar := false
 	pos := fs.GetPos(key)
 	if pos != -1 {
 		svar = fs.files[pos].pin
 	}
-
-	fs.mtx.Unlock()
 	return svar
 }
 
@@ -148,12 +146,20 @@ func (fs *FileSystem) Unpin(key KademliaID) {
 	fs.mtx.Unlock()
 }
 
-func (fs *FileSystem) Delete(key KademliaID) {
-	fs.mtx.Lock()
+func (fs *FileSystem) Delete(key KademliaID) { //Kallas med låst mtx
+	fmt.Println("Delete has been called")
 	pos := fs.GetPos(key)
+	if pos == -1 {
+		fmt.Println("File does not exist length is", len(fs.files))
+	} else{
+		fmt.Println("Pos is not -1")
+	}
 	if !fs.Pinned(key) {
+		fmt.Println("File exists and is not pinned")
 		if (pos == 0) && (len(fs.files) == 1) {
-			fs.files = []File{}
+			fmt.Println("case 1")
+			fs.files = fs.files[:0]
+			fmt.Println("deletion done")
 		} else if pos == 0 {
 			fs.files = fs.files[pos+1:]
 		} else if pos == len(fs.files) {
@@ -161,6 +167,7 @@ func (fs *FileSystem) Delete(key KademliaID) {
 		} else {
 			fs.files = append(fs.files[:pos-1], fs.files[pos+1:]...)
 		}
+	} else{
+		fmt.Println("File is pinned")
 	}
-	fs.mtx.Unlock()
 }

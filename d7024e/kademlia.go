@@ -28,6 +28,7 @@ func NewKademlia(me Contact) (kademlia *Kademlia){
 	kademlia.mutex = &sync.Mutex{}
 	kademlia.net = NewNetwork(me, NewRoutingTable(me))
 	go kademlia.StartRepublish()
+	go kademlia.RemoveExpired()
 	return kademlia
 }
 
@@ -59,7 +60,7 @@ func (kademlia *Kademlia) StartRepublish() {
 		kclosest = kademlia.LookupContact(&contact)
 		for i := 0; i < len(kclosest); i++ {
 			go kademlia.net.SendStoreMessage(&kclosest[i], keystring, data)
-			time.Sleep(5 * time.Millisecond)
+			time.Sleep(3 * time.Millisecond)
 		}
 	}
 	go kademlia.StartRepublish()
@@ -79,6 +80,24 @@ func (net *Network) GetRT() *RoutingTable {
 
 func (net *Network) GetFS() FileSystem {
 	return net.fs
+}
+
+func (kademlia *Kademlia) RemoveExpired(){
+	fmt.Println("Remove Expired started in network")
+	time.Sleep(6 * 60 * 1000 * time.Millisecond)
+	fs := kademlia.getFileSystem()
+	fs.mtx.Lock()
+	fmt.Println("length of fs is ", len(fs.files))
+	for i := 0; i<len(fs.files); i++ {
+		fmt.Println("exp: looprunda", i)
+		if fs.Expired(fs.files[i].key) {
+			fmt.Println("A file has expired")
+			fs.Delete(fs.files[i].key)
+			fmt.Println("A file has been deleted")
+		}
+	}
+	fs.mtx.Unlock()
+	go kademlia.RemoveExpired()
 }
 
 func (kademlia *Kademlia) LookupContact(target *Contact) []Contact {
@@ -111,7 +130,7 @@ func (kademlia *Kademlia) LookupContact(target *Contact) []Contact {
 		time.Sleep(100 * time.Millisecond)
 		// response received
 		if len(kademlia.net.lookupResp) > 0 && len(kademlia.net.lookupResponder) > 0 {
-			//fmt.Println("Jag fick ett svar!!")
+			fmt.Println("Jag fick ett svar!!")
 			//fmt.Printf("Fick svar","%v, %v, %v, %v\n", kademlia.net.lookupResp[0], kademlia.net.lookupResponder[0], unresponded, contacttimes, "\n")
 
 			// if reponder missed time
@@ -128,6 +147,9 @@ func (kademlia *Kademlia) LookupContact(target *Contact) []Contact {
 
 			//Tar bort responsen och respondern från nätverket
 			if len(kademlia.net.lookupResp) <= 1 {
+				//kademlia.net.lookupResp = [][]Contact{}
+				fmt.Println("Tömmer lookupResp")
+				kademlia.net.lookupResp = kademlia.net.lookupResp[:0]
 				kademlia.net.lookupResp = [][]Contact{}
 				//fmt.Println(len(kademlia.net.lookupResp))
 			} else{
@@ -149,7 +171,7 @@ func (kademlia *Kademlia) LookupContact(target *Contact) []Contact {
 				if currentcon < alpha {            //Om currentcon är mindre än alpha
 					if !isElementof(kclosest[i], contacted) && !isElementof(kclosest[i], unresponded) {  //Om nuvarande element inte kontaktad och inte väntande. Skicka RPC
 						//fmt.Println("Jag ska inte köras, ny go, currentalpha är ", currentcon, len(contacted), len(unresponded))
-						//fmt.Println("Jag startar en missing connection")
+						fmt.Println("Jag startar en missing connection")
 						go kademlia.net.SendFindContactMessage(&kclosest[i], target.ID)
 						contacted = append(contacted, kclosest[i])
 						unresponded = append(unresponded, kclosest[i])
@@ -378,7 +400,7 @@ func (kademlia *Kademlia) LookupContact(target *Contact) []Contact {
 		contact := NewContact(&key, "1234567")
 		kclosest := kademlia.LookupContact(&contact)
 
-		//fmt.Printf("Lookup i store blev klar Svaret och key blev", "%v\n", kclosest, keystring)
+		fmt.Printf("Lookup i store blev klar Svaret och key blev", "%v\n", kclosest, keystring)
 
 		for i := 0; i < len(kclosest); i++ {
 			go kademlia.net.SendStoreMessage(&kclosest[i], keystring, data)
