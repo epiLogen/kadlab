@@ -42,6 +42,10 @@ func TestKademlia(t *testing.T) {
     time.Sleep(50*time.Millisecond)
   }
 
+  nodes[0].Store("test")
+  time.Sleep(5*1000*time.Millisecond)
+  nodes[0].LookupData("test")
+
 
 
 	fmt.Println("hello from kadtest")
