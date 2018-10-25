@@ -19,7 +19,7 @@ type Network struct {
 	lookupResp      [][]Contact
 	lookupResponder []Contact
 	pingResp        []Contact
-	mtx             *sync.Mutex
+	mtx             *sync.RWMutex
 	fs              FileSystem
 	data 						string
 }
@@ -28,23 +28,11 @@ func NewNetwork(me Contact, rt *RoutingTable) Network {
 	network := Network{}
 	network.me = me
 	network.rt = rt
-	network.mtx = &sync.Mutex{}
+	network.mtx = &sync.RWMutex{}
 	network.fs = NewFileSystem()
 	network.data = ""
 	return network
 }
-
-// type RpcHandler struct {
-//   network *Network
-//   mutex   *sync.Mutex
-// }
-//
-// func NewRpcHandler(n *Network) *RpcHandler {
-//   rpc := &RpcHandler{}
-//   rpc.network = n
-//   rpc.mutex = &sync.Mutex{}
-//   return rpc
-// }
 
 func handleRPC(ch chan []byte, me *Contact, net *Network) {
 	rawdata := <-ch
@@ -66,29 +54,24 @@ func handleRPC(ch chan []byte, me *Contact, net *Network) {
 	//Ping findnode findvalue store
 	switch message.GetLabel() {
 	case "ping":
-		// fmt.Println("Just got pinged omg")
-		// fmt.Println("label:", message.GetLabel())
-		// fmt.Println("senderID:", message.GetSenderId())
-		// fmt.Println("senderAddr:", message.GetSenderAddr())
-
 		resp := buildMessage([]string{"pingresp", me.ID.String(), me.Address})
 		sendMessage(message.GetSenderAddr(), resp)
 
 	case "pingresp":
-		net.mtx.Lock()
+		//net.mtx.Lock()
 		//fmt.Println("I got pingresponse from:", message.GetSenderId(), message.GetSenderAddr())
 		id := NewKademliaID(message.GetSenderId())
 		responder := NewContact(id, message.GetSenderAddr())
 		net.pingResp = append(net.pingResp, responder)
-		net.mtx.Unlock()
+		//net.mtx.Unlock()
 		//fmt.Printf("Utskrift av pingresp", "%v,\n", net.pingResp, "\n")
 
 	case "lookup":
-		net.mtx.Lock()
-		//fmt.Println("I got a lookupreq from:", message.GetSenderId(), message.GetSenderAddr())
+		//net.mtx.Lock()
+		fmt.Println("I got a lookupreq from:", message.GetSenderId(), message.GetSenderAddr())
 		id := NewKademliaID(message.GetLookupId())
 		kclosest := net.rt.FindClosestContacts(id, 20)
-		net.mtx.Unlock()
+		//net.mtx.Unlock()
 		t := ""
 		for i := 0; i < len(kclosest); i++ {
 			t = t + kclosest[i].String() + "\n"
@@ -97,8 +80,7 @@ func handleRPC(ch chan []byte, me *Contact, net *Network) {
 		sendMessage(message.GetSenderAddr(), resp)
 
 	case "lookupresp":
-		//fmt.Println("I got a lookuprespons from:", message.GetSenderId(), message.GetSenderAddr())
-		net.mtx.Lock()
+		fmt.Println("I got a lookuprespons from:", message.GetSenderId(), message.GetSenderAddr())
 		t := string(message.GetLookupResp())
 
 		contacts := []Contact{}
@@ -110,55 +92,45 @@ func handleRPC(ch chan []byte, me *Contact, net *Network) {
 			contacts = append(contacts, NewContact(NewKademliaID(row[1]), row[3]))
 		}
 
+		net.mtx.Lock()
 		net.lookupResp = append(net.lookupResp, [][]Contact{contacts}...)
 		id := NewKademliaID(message.GetSenderId())
 		responder := NewContact(id, message.GetSenderAddr())
 		net.lookupResponder = append(net.lookupResponder, responder)
+		net.mtx.Unlock()
+		time.Sleep(10 * time.Millisecond)
 
 		//Uppdaterar routing table ebola bugfix
+		breakern := false
 		for i := 0; i < len(net.lookupResp); i++ {
-			if i < 0 {
+			//net.mtx.RLock()
+			if breakern == true {
+				break
+			} else if i > len(net.lookupResp) -1 {
+				//net.mtx.RUnlock()
 				break
 			}
-			if net.lookupResp != nil {
-				if net.lookupResp[i] != nil {
-					if len(net.lookupResp[i]) != 0 {
-						if i > len(net.lookupResp) -1 {
-							fmt.Println("Index gick out of range")
-							i = len(net.lookupResp) -2
-							if i < 0 {
-								fmt.Println("Index blev under 0")
-								i = 0
-								break
-							}
-						}
-						if i < 0 {
-							fmt.Println("Index blev under 0")
-							i = 0
-							break
-						}
-						for j := 0; j < len(net.lookupResp[i]); j++ {
-							//time.Sleep(1 * time.Millisecond) //Denna orsakade indexerror?
-							net.RefreshRT(net.lookupResp[i][j])
-
-							if i > len(net.lookupResp) -1 {
-								fmt.Println("Index gick out of range innre", len(net.lookupResp))
-								i = len(net.lookupResp) -2
-								if i < 0 {
-									fmt.Println("Index blev under 0 innre")
-									i = -5
-									break
-								}
-							}
-						}
+				for j := 0; j < len(net.lookupResp[i]); j++ {
+					if i > len(net.lookupResp) -1 {
+						breakern = true
+						break
+					}
+					if j > len(net.lookupResp[i]){
+						breakern = true
+						break
+					}
+					net.RefreshRT(net.lookupResp[i][j])
+					if i > len(net.lookupResp) -1 {
+						breakern = true
+						break
 					}
 				}
-			}
-			//time.Sleep(1 * time.Millisecond)
+			//net.mtx.RUnlock()
+			time.Sleep(10 * time.Millisecond)
 		}
-		net.mtx.Unlock()
 
 	case "lookupdata":
+		fmt.Println("Just got lookupdata request key is: ", message.GetKey())
 		key := NewKademliaIDnp(message.GetKey())
 		file := net.fs.GetFile(key)
 
@@ -177,18 +149,16 @@ func handleRPC(ch chan []byte, me *Contact, net *Network) {
 			response := buildMessage([]string{"lookupdataresp", me.ID.String(), me.Address, file})
 			sendMessage(message.GetSenderAddr(), response)
 
-			// remove file if old (only works if not pinned)
-//			if net.fs.Expired(key) {
-	//			net.fs.Delete(key)
-		//	}
-
 		}
 	case "lookupdataresp":
+		//fmt.Println("Sending my file :)")
 		net.mtx.Lock()
 		net.data = string(message.Data)
 		net.mtx.Unlock()
+		time.Sleep(10 * time.Millisecond)
 
 	case "store":
+		fmt.Println("Got a store request")
 		hash := []byte(message.GetData())
 		key := KademliaID(sha1.Sum(hash))
 
@@ -199,6 +169,7 @@ func handleRPC(ch chan []byte, me *Contact, net *Network) {
 		time.Sleep(50 * time.Millisecond)
 
 	case "pin":
+		fmt.Println("Got a pin request")
 		key := NewKademliaIDnp(message.GetKey())
 		file := net.fs.GetFile(key)
 
@@ -207,6 +178,7 @@ func handleRPC(ch chan []byte, me *Contact, net *Network) {
 		}
 
 	case "unpin":
+		fmt.Println("Got an unpin request")
 		key := NewKademliaIDnp(message.GetKey())
 		file := net.fs.GetFile(key)
 
@@ -243,7 +215,7 @@ func buildMessage(input []string) *protobuf.Kmessage {
 		}
 		return message
 	case "lookup":
-		//fmt.Println("Building lookup")
+		fmt.Println("Building lookup")
 		message := &protobuf.Kmessage{
 			Label:      *proto.String(input[0]),
 			SenderId:   *proto.String(input[1]),
@@ -252,7 +224,7 @@ func buildMessage(input []string) *protobuf.Kmessage {
 		}
 		return message
 	case "lookupresp":
-		//fmt.Println("Building lookupresp")
+		fmt.Println("Building lookupresp")
 		message := &protobuf.Kmessage{
 			Label:      *proto.String(input[0]),
 			SenderId:   *proto.String(input[1]),
@@ -321,21 +293,20 @@ func buildMessage(input []string) *protobuf.Kmessage {
 }
 
 func (network *Network) SendPingMessage(contact *Contact) bool {
-	network.pingResp = []Contact{}
+	//network.pingResp = []Contact{}
 	message := buildMessage([]string{"ping", network.me.ID.String(), network.me.Address})
 	sendMessage(contact.Address, message)
 
 	//fmt.Println("Skickat ping väntar på svar")
 	time.Sleep(time.Second * 2)
 	//fmt.Println("Väntat klart")
-	network.mtx.Lock()
 	if network.inPingResp(contact) {
 		//fmt.Println("Fick svar")
-		network.mtx.Unlock()
+		time.Sleep(10 * time.Millisecond)
 		return true
 	} else {
 		//fmt.Println("Fick inte ett svar")
-		network.mtx.Unlock()
+		time.Sleep(10 * time.Millisecond)
 		return false
 	}
 
@@ -356,7 +327,7 @@ func sendMessage(Address string, message *protobuf.Kmessage) {
 		defer Conn.Close()
 		_, err = Conn.Write(data)
 		if err != nil {
-			fmt.Println("Write Error: ", err)
+			//fmt.Println("Write Error: ", err)
 		}
 	}
 
@@ -393,17 +364,12 @@ func (network *Network) Listen(me Contact) {
 
 //Find node RPC
 func (network *Network) SendFindContactMessage(contact *Contact, targetid *KademliaID) {
-	network.lookupResp = [][]Contact{}
-	network.lookupResponder = []Contact{}
 	message := buildMessage([]string{"lookup", network.me.ID.String(), network.me.Address, targetid.String()})
 	sendMessage(contact.Address, message)
 }
 
 //Find value RPC
 func (network *Network) SendFindDataMessage(contact *Contact, hash string) {
-	network.data = ""
-	network.lookupResp = [][]Contact{}
-	network.lookupResponder = []Contact{}
 	message := buildMessage([]string{"lookupdata", network.me.ID.String(), network.me.Address, hash})
 	sendMessage(contact.Address, message)
 }
@@ -420,6 +386,7 @@ func (network *Network) SendUnPinMessage(contact *Contact, key string) {
 
 //Store RPC
 func (network *Network) SendStoreMessage(contact *Contact, key string, data string) {
+	//fmt.Println("Storen kallad jao")
 	message := buildMessage([]string{"store", network.me.ID.String(), network.me.Address, key, data})
 	sendMessage(contact.Address, message)
 }
@@ -430,7 +397,7 @@ func (network *Network) RefreshRT(contact Contact) {
 		return
 	}
 
-	// find bucket contact should be placed in
+	// find the bucket contact should be placed in
 	bucket := network.rt.buckets[network.rt.getBucketIndex(contact.ID)]
 
 	if bucket.ContactinBucket(contact) {
@@ -443,7 +410,7 @@ func (network *Network) RefreshRT(contact Contact) {
 			oldestContact := bucket.list.Back().Value.(Contact)
 			svar := network.SendPingMessage(&oldestContact)
 			if !svar {
-				//fmt.Println("Contact DÖD")
+				//fmt.Println("Contact nere")
 				bucket.RemoveContact(oldestContact)
 				bucket.AddContact(contact)
 			} else {
@@ -453,23 +420,12 @@ func (network *Network) RefreshRT(contact Contact) {
 	}
 }
 
-// checks if contact responded to ping, removes the response if so
+// checks if contact responded to ping and emties pingresp
 func (network *Network) inPingResp(c *Contact) bool {
-	for i := 0; i < len(network.pingResp); i++ {
-		if c.String() == network.pingResp[i].String() {
-			if (i == 0) && (len(network.pingResp) == 1) {
-				network.pingResp = []Contact{}
-			} else if i == 0 {
-				network.pingResp = network.pingResp[i+1:]
-			} else if i == len(network.pingResp) {
-				network.pingResp = network.pingResp[:i-1]
-			} else {
-				network.pingResp = append(network.pingResp[:i-1], network.pingResp[i+1:]...)
-			}
-			//fmt.Println("Jag har hittat pingen")
-			return true
-		} else {
-		}
+	if len(network.pingResp) > 1 {
+		network.pingResp = []Contact{}
+		return true
 	}
+	network.pingResp = []Contact{}
 	return false
 }

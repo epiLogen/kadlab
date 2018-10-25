@@ -10,13 +10,13 @@ import (
 	"time"
  	"os/exec"
 	"math/rand"
-	"crypto/sha1"
+	//"crypto/sha1"
 )
 
 func main() {
 	//mymain()
 	//time.Sleep(30 * 1000 * time.Millisecond)
-	fmt.Println("hello world")
+	fmt.Println("Hello world")
 	dockermain()
 
 }
@@ -37,23 +37,24 @@ func dockermain() {
 
 	//Skapa main kontakt
 	mainID := kad.NewKademliaID("FFFFFFFFFFF11111111111111111111111111005")
-	maincontact := kad.NewContact(mainID, "172.19.0.2:8080")
+	maincontact := kad.NewContact(mainID, "172.19.0.3:8080")
 
 	//Store data
-	storedata := "Hello World 123"
-	hash := []byte(storedata)
-	key := kad.KademliaID(sha1.Sum(hash))
+	//storedata := "Hello World 123"
+	//hash := []byte(storedata)
+	//key := kad.KademliaID(sha1.Sum(hash))
 	//strang := key.String()
 	//key2 := kad.NewKademliaIDnp(strang)
-	fmt.Println("Key 1 is", key.String())
+	//fmt.Println("Key 1 is", key.String())
 	time.Sleep(5 * 1000 * time.Millisecond)
 
-	if myIP.String() == "172.19.0.2" { //Jag är main
+	if myIP.String() == "172.19.0.3" { //Jag är main
 		fmt.Println("Jag vet att jag är main")
 		node := kad.NewKademlia(maincontact)
 		time.Sleep(5 * 1000 * time.Millisecond)
 		go node.GetNetwork().Listen(maincontact)
 		time.Sleep(30 * 1000 * time.Millisecond)      //Starta main listen
+		NewServer("172.19.0.3:8081", node)
 		//node.GetNetwork().GetRT().PrintRoutingTable() //Printa min RT
 		time.Sleep(30 * 1000 * time.Millisecond)
 		time.Sleep(2*60 * 1000 * time.Millisecond)
@@ -63,7 +64,7 @@ func dockermain() {
 		// file := fs.GetFile(key2)
 		// fmt.Println("Filen är",file)
 
-	  time.Sleep(2000 * 60 * 1000 * time.Millisecond)
+	  time.Sleep(5000 * 60 * 1000 * time.Millisecond)
 
 	} else {
 		time.Sleep(15 * 1000 * time.Millisecond) //Chilla
@@ -75,28 +76,31 @@ func dockermain() {
 		rand := rand.Intn(75)
 		time.Sleep(time.Duration(rand) * 1000 * time.Millisecond)
 		node1.GetNetwork().SendFindContactMessage(&maincontact, contact1.ID) //Informera main om att jag finns
-		time.Sleep(30 * 1000 * time.Millisecond)                             //Chilla
+		time.Sleep(20 * 1000 * time.Millisecond)                             //Chilla
 		//node1.GetNetwork().GetRT().PrintRoutingTable()  //Print RT
-		time.Sleep(30 * 1000 * time.Millisecond)
+		time.Sleep(20 * 1000 * time.Millisecond)
 
-		if myIP.String() == "172.19.0.3" {
-			fmt.Println("Storar", storedata)
-			node1.Store(storedata)
-			fmt.Println("Storen är avslutad")
+
+		if myIP.String() == "172.19.0.4" {
+			//fmt.Println("Storar", storedata)
+			//node1.Store(storedata)
+			//fmt.Println("Storen är avslutad")
 			//Vänta 2 min
-			time.Sleep(1 * 60 * 1000 * time.Millisecond)
+			time.Sleep(25 * 1000 * time.Millisecond)
 
-//			fmt.Println("Gör en lookup med key", key.String())
-//			lookupsvar := node1.LookupData(key.String())
-//			fmt.Println("Gör en pin med key", key.String())
-//			node1.Pin(key)
-			time.Sleep(2 * 60 * 1000 * time.Millisecond)
-//			node1.UnPin(key)
+			///fmt.Println("Gör en lookup med key", key.String())
+			//lookupsvar := node1.LookupData(key.String())
+			//fmt.Println("Svaret på lookupen blev: ", lookupsvar)
+			time.Sleep(15 * 1000 * time.Millisecond)
+			//fmt.Println("Gör en pin med key", key.String())
+			//node1.Pin(key)
+			//time.Sleep(15 * 1000 * time.Millisecond)
+			//node1.UnPin(key)
 
-			time.Sleep(2000* 60*1000 * time.Millisecond)
+			time.Sleep(5000* 60*1000 * time.Millisecond)
 			//fmt.Println(lookupsvar)
 		} else {
-			time.Sleep(2000 * 60 * 1000 * time.Millisecond)
+			time.Sleep(5000 * 60 * 1000 * time.Millisecond)
 		}
 
 		// if myIP.String() == "172.19.0.3" { //Denna nod får göra en lookup hos mainen av mainen och få 20 noder

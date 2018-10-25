@@ -46,16 +46,16 @@ func (fs *FileSystem) Store(key KademliaID, file string, publisher string) {
 
 	fs.mtx.Unlock()
 
-	//file = fs.GetFile(key)
+	file = fs.GetFile(key)
 
 }
 
 func (fs *FileSystem) GetRepublish(republishmin int) []File {
-	fmt.Println("Getrepublish initierad")
+	//fmt.Println("Getrepublish initierad")
 	svar := []File{}
 	now := time.Now()
 	for i := 0; i < len(fs.files); i++ {
-		fmt.Println("File diff time and comptime",now.Sub(fs.files[i].time), "Separering", time.Minute*time.Duration(republishmin-2))
+		fmt.Println("File diff time and comptime",now.Sub(fs.files[i].time), "Separering", time.Minute*time.Duration(republishmin-1))
 		if now.Sub(fs.files[i].time) > time.Minute*time.Duration(republishmin-1) {
 			svar = append(svar, fs.files[i])
 		}
@@ -85,7 +85,7 @@ func (fs *FileSystem) GetFile(key KademliaID) string {
 	}
 	fs.mtx.Unlock()
 
-	fmt.Println("Getfile called size is, key is, svar is", len(fs.files), key.String(), svar)
+	fmt.Println("Getfile called key is", key.String())
 
 	return svar
 }
@@ -112,7 +112,7 @@ func (fs *FileSystem) Expired(key KademliaID) bool { //Kallas med låst mtx
 	now := time.Now()
 	age := now.Sub(timen)
 	fmt.Println("age is", age)
-	if age > time.Minute*6 {
+	if age > time.Minute*24*60 {
 		return true
 	} else {
 		return false

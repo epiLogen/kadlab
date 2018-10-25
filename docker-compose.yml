@@ -6,8 +6,18 @@ services:
     tty: true
     expose:
       - "8080/udp"
+      - "8081/udp"
     networks:
       - kademlia_network
+  servernode:
+    build: servernode
+    stdin_open: true
+    tty: true
+    expose:
+      - "8080/udp"
+      - "8081/udp"
+    networks:
+    - kademlia_network
 
 networks:
   kademlia_network:

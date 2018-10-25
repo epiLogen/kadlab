@@ -20,8 +20,8 @@ type ContactTime struct {
 
 const k = 20
 const alpha = 3
-const republishmin = 5
-const republishforpub = 7
+const republishmin = 60
+const republishforpub = 24*60
 
 func NewKademlia(me Contact) (kademlia *Kademlia){
 	kademlia = new(Kademlia)
@@ -35,8 +35,8 @@ func NewKademlia(me Contact) (kademlia *Kademlia){
 func (kademlia *Kademlia) StartRepublish() {
 	fmt.Println("StartRepublish initierad")
 	rand := rand.Intn(20)
-	time.Sleep(time.Duration(republishmin) * time.Duration(60+rand) * 1000 * time.Millisecond)
-	fmt.Println("StartRepublish startad")
+	time.Sleep(time.Duration(republishmin) * time.Duration(60-rand) * 1000 * time.Millisecond)
+	//fmt.Println("StartRepublish startad")
 	republishfiles := kademlia.getFileSystem().GetRepublish(republishmin)
 
 	data := ""
@@ -44,6 +44,7 @@ func (kademlia *Kademlia) StartRepublish() {
 	key := KademliaID(sha1.Sum(hash))
 	keystring := key.String()
 	contact := NewContact(&key, "1234567")
+	//fmt.Println("Kör lookupen i minirepublishen")
 	kclosest := kademlia.LookupContact(&contact)
 
 	if len(republishfiles) == 0 || len(kclosest) == 0 {
@@ -84,7 +85,7 @@ func (net *Network) GetFS() FileSystem {
 
 func (kademlia *Kademlia) RemoveExpired(){
 	fmt.Println("Remove Expired started in network")
-	time.Sleep(6 * 60 * 1000 * time.Millisecond)
+	time.Sleep(24 * 60 * 60 * 1000 * time.Millisecond)
 	fs := kademlia.getFileSystem()
 	fs.mtx.Lock()
 	fmt.Println("length of fs is ", len(fs.files))
@@ -104,123 +105,143 @@ func (kademlia *Kademlia) LookupContact(target *Contact) []Contact {
 	// find k closest from local routing table, comes sorted by distance
 	kclosest := kademlia.net.rt.FindClosestContacts(target.ID, k)
 
-	contacted := []Contact{}
-	unresponded := []Contact{}
-	contacttimes := []ContactTime{}
-	missedtime := []Contact{}
-	currentcon := alpha
+	contacted := []Contact{} //Dom som blivit kontaktade, kan ej tas bort
+	contacttimes := []ContactTime{}  //tider, vi går igenom dom sen tar bort då vi hittar nån
+	missedtime := []Contact{} //Dom som missat tiden kan ej tas bort
+	currentcon := alpha //Antal aktiva connections
+	currenttime := time.Now()
 
-	if len(kclosest) == 0 {
+
+	if len(kclosest) == 0 { //Om kclosest inte räcker till
 		fmt.Println("Tom routing tabell")
 		return []Contact{}
 	} else if len(kclosest) < alpha{
-		currentcon = len(kclosest)
+		currentcon = len(kclosest) //Sätt connections
 	}
 
 	// contact alpha of k closest to learn about even closer nodes
 	for i := 0; i < currentcon; i++ {
+		//fmt.Println("Startar en connection")
 		contacted = append(contacted, kclosest[i])
-		unresponded = append(unresponded, kclosest[i])
 		contacttimes = append(contacttimes, ContactTime{kclosest[i], time.Now()})
 		go kademlia.net.SendFindContactMessage(&kclosest[i], target.ID)
 	}
 
+	prevtime := time.Now()
 	// keep contacting unqueried nodes after response/timeout
 	for {
 		time.Sleep(100 * time.Millisecond)
-		// response received
-		if len(kademlia.net.lookupResp) > 0 && len(kademlia.net.lookupResponder) > 0 {
-			fmt.Println("Jag fick ett svar!!")
-			//fmt.Printf("Fick svar","%v, %v, %v, %v\n", kademlia.net.lookupResp[0], kademlia.net.lookupResponder[0], unresponded, contacttimes, "\n")
+		currenttime = time.Now()
+		if currenttime.Sub(prevtime).Nanoseconds() > 5000000000 {
+			fmt.Printf("Lookup avslutad","längd: lookupresp", len(kademlia.net.lookupResp), "lookupresponder", kademlia.net.lookupResponder, "len contacttimes", len(contacttimes), "len contacted", len(contacted), "currentcon", currentcon, "len kclosest", len(kclosest), "\n")
+			return kclosest //time out
+		}
 
-			// if reponder missed time
-			if isElementof(kademlia.net.lookupResponder[0], missedtime){
-				missedtime = kademlia.deleteContact(kademlia.net.lookupResponder[0], missedtime)
-			} else {
+
+		// response received
+		kademlia.net.mtx.RLock()
+		if len(kademlia.net.lookupResp) > 0 && len(kademlia.net.lookupResponder) > 0 {
+			kademlia.net.mtx.RUnlock()
+			time.Sleep(10 * time.Millisecond)
+			prevtime = time.Now()
+			fmt.Println("Jag fick ett svar")
+
+
+			if !isElementof(kademlia.net.lookupResponder[0], missedtime){ //Om kontakten inte missad tiden dra av connection
 				currentcon = currentcon -1
 			}
 
-			//Delete from unresponded
-			kademlia.net.mtx.Lock()
-			unresponded = kademlia.deleteContact(kademlia.net.lookupResponder[0], unresponded)
-			contacttimes = kademlia.deleteTime(kademlia.net.lookupResponder[0], contacttimes)
 
+			//Delete from contacttimes
+			contacttimes = kademlia.deleteTime(kademlia.net.lookupResponder[0], contacttimes) //Ta bort från contecttimes så vi inte går igenom han
+			kademlia.net.mtx.Lock()
 			//Tar bort responsen och respondern från nätverket
 			if len(kademlia.net.lookupResp) <= 1 {
-				//kademlia.net.lookupResp = [][]Contact{}
-				fmt.Println("Tömmer lookupResp")
-				kademlia.net.lookupResp = kademlia.net.lookupResp[:0]
+				//fmt.Println("Tömmer lookupResp")
 				kademlia.net.lookupResp = [][]Contact{}
-				//fmt.Println(len(kademlia.net.lookupResp))
 			} else{
 				kademlia.net.lookupResp = kademlia.net.lookupResp[1:]
 			}
 			if len(kademlia.net.lookupResponder) <= 1 {
 				kademlia.net.lookupResponder = []Contact{}
-				//fmt.Printf("%v\n", kademlia.net.lookupResponder)
 			} else{
 				kademlia.net.lookupResponder = kademlia.net.lookupResponder[1:]
 			}
 			kademlia.net.mtx.Unlock()
-
-			//Uppdatera kclosest
-			kclosest = kademlia.net.rt.FindClosestContacts(target.ID, k)
+			kclosest = kademlia.net.rt.FindClosestContacts(target.ID, k) //Uppdatera k closest med nya routing tablen (från responsen)
 
 			//Start the missing connections (to alpha)
 			for i := 0; i < len(kclosest); i++ { //För varje element i kclosest (Så man ej går out of bound)
 				if currentcon < alpha {            //Om currentcon är mindre än alpha
-					if !isElementof(kclosest[i], contacted) && !isElementof(kclosest[i], unresponded) {  //Om nuvarande element inte kontaktad och inte väntande. Skicka RPC
-						//fmt.Println("Jag ska inte köras, ny go, currentalpha är ", currentcon, len(contacted), len(unresponded))
-						fmt.Println("Jag startar en missing connection")
+					if !isElementof(kclosest[i], contacted) && !isElementof(kclosest[i], missedtime) {  //Om nuvarande element inte kontaktad och inte har missat tiden, kontakta.
+						fmt.Println("Startar en missing connection")
 						go kademlia.net.SendFindContactMessage(&kclosest[i], target.ID)
-						contacted = append(contacted, kclosest[i])
-						unresponded = append(unresponded, kclosest[i])
-						contacttimes = append(contacttimes, ContactTime{kclosest[i], time.Now()})
+						contacted = append(contacted, kclosest[i]) //Lägg till i contacted
+						contacttimes = append(contacttimes, ContactTime{kclosest[i], time.Now()}) //Lägg till tid
 						currentcon = currentcon + 1 //Öka current con
 						time.Sleep(100 * time.Millisecond)
 					}
+				}else{ //Om det finns tillräckligt med cons avbryt ökningen direkt
+					break
 				}
 			}
 		} else{
+			kademlia.net.mtx.RUnlock()
 			time.Sleep(250 * time.Millisecond)
 		}
 		time.Sleep(250 * time.Millisecond)
-		//Kolla om nån är sen
-		for i := 0; i<len(contacttimes); i++ {
+		//Kolla om nån är sen. Gå igenom alla
+		for i := 0; i<len(contacttimes)-1; i++ {
 			//fmt.Println("Kollar times")
-			if time.Now().Sub(contacttimes[i].ct).Nanoseconds() > 5000000000 { //nån är sen
+			if time.Now().Sub(contacttimes[i].ct).Nanoseconds() > 500000000 { //nån är sen, ta bort dom
 					//lägg till i missed time och minska currentconnections (väntar ej längre på han)
+
 				missedtime = append(missedtime, contacttimes[i].contact)
 				currentcon = currentcon -1
-				//fmt.Println("Nån har missat tiden", contacttimes[i].contact)
+				//fmt.Println("Nån har missat tiden") //Tas bort från contact times (Vi ska inte gå igenom dom igen)
+
+				//Ta bort från routing tablen så dom inte kommer med i kclosest igen. Om detta är en nod.
+				if contacttimes[i].contact.Address != "1234567"{
+					bucket := kademlia.net.rt.buckets[kademlia.net.rt.getBucketIndex(contacttimes[i].contact.ID)]
+					bucket.RemoveContact(contacttimes[i].contact)
+				}
+				kclosest = kademlia.net.rt.FindClosestContacts(target.ID, k) //Updatera kclosest
 
 				for j := 0; j < len(kclosest); j++ { // Gå igenom kclosest
 
-					if !isElementof(kclosest[j], contacted) && !isElementof(kclosest[j], unresponded) { //om nån ej blivit kontaktad
-						//fmt.Println("sista ifen, jag ska definitivt inte köras", string(len(contacttimes)))
+					if !isElementof(kclosest[j], contacted) && !isElementof(kclosest[j], missedtime) { //om nån ej blivit kontaktad och inte missat tiden
+						fmt.Println("Startar en missing connection")
 						go kademlia.net.SendFindContactMessage(&kclosest[i], target.ID)  //Kontakta han
 						contacted = append(contacted, kclosest[i])
-						unresponded = append(unresponded, kclosest[i])
 						contacttimes = append(contacttimes, ContactTime{kclosest[i], time.Now()})
 						currentcon = currentcon + 1 //Öka current con
 						break							//Endast en anslutning per missad tid
 					}
+					if currentcon >= alpha { //Om tillräckligt med cons avbryt dirr
+						break
+					}
 				}
+				contacttimes = kademlia.deleteTime(contacttimes[i].contact, contacttimes) //Ta bort från contacttimes i slutet så man undviker indexfel
 			}
 		}
 
-		//Kolla om det finns nån som inte har blivit kontaktad och inte missat tiden isf fortsätt
 		terminate := true
 		for i := 0; i < len(kclosest); i++ {
-			if !isElementof(kclosest[i], contacted) || (!isElementof(kclosest[i], missedtime) && isElementof(kclosest[i], unresponded)){
-				//fmt.Println("Det finns ännu nån att kontakta")
+			if !isElementof(kclosest[i], contacted){ // Om nån inte blivit kontaktad
+				terminate = false
+			} else if !isElementof(kclosest[i], missedtime) { //eller om nån har det men inte har missat tiden
 				terminate = false
 			}
 		}
 
-		if terminate { //Om inte avsluta och returnera kclosest
+		if currentcon <= 0 ||  currentcon > alpha || len(contacted) > 100 { //If we dont have any waiting connections terminate (timeout)
+			terminate = true
+		}
+
+
+		if terminate { //Om terminate avsluta och returnera kclosest
 			fmt.Println("\n")
-			//fmt.Printf("Lookup avslutad","%v, %v, %v, %v", len(kademlia.net.lookupResp), kademlia.net.lookupResponder, unresponded, contacttimes, contacted, currentcon, "\n")
+			fmt.Printf("Lookup avslutad","längd: lookupresp", len(kademlia.net.lookupResp), "lookupresponder", kademlia.net.lookupResponder, "len contacttimes", len(contacttimes), "len contacted", len(contacted), "currentcon", currentcon, "len kclosest", len(kclosest), "\n")
 			//fmt.Println("Terminerar")
 			return kclosest
 		}
@@ -275,17 +296,17 @@ func (kademlia *Kademlia) LookupContact(target *Contact) []Contact {
 		key := KademliaID(sha1.Sum(hashb))
 		if kademlia.net.fs.GetFile(key) != ""{
 			fmt.Println("LookupData: I have the file")
-			return kademlia.net.fs.GetFile(key)
+			//return kademlia.net.fs.GetFile(key)
 		}
-
 
 		kclosest := kademlia.net.rt.FindClosestContacts(&key, k)
 
 		contacted := []Contact{}
-		unresponded := []Contact{}
 		contacttimes := []ContactTime{}
 		missedtime := []Contact{}
 		currentcon := alpha
+		currenttime := time.Now()
+		prevtime := time.Now()
 
 		if len(kclosest) == 0 {
 			fmt.Println("Tom routing tabell")
@@ -298,36 +319,48 @@ func (kademlia *Kademlia) LookupContact(target *Contact) []Contact {
 		for i := 0; i < currentcon; i++ {
 			go kademlia.net.SendFindDataMessage(&kclosest[i], hash)
 			contacted = append(contacted, kclosest[i])
-			unresponded = append(unresponded, kclosest[i])
 			contacttimes = append(contacttimes, ContactTime{kclosest[i], time.Now()})
 		}
 
 		// keep contacting unqueried nodes after response/timeout
 		for {
 			time.Sleep(100 * time.Millisecond)
+			currenttime = time.Now()
+			if currenttime.Sub(prevtime).Nanoseconds() > 50000000000 {
+				return kademlia.LookupDataD(hash)
+			}
+			//fmt.Println("1")
 
 			// response received
+			//kademlia.net.mtx.RLock()
 			if kademlia.net.data != "" { //File found
+				//kademlia.net.mtx.RUnlock()
+				time.Sleep(10 * time.Millisecond)
 				fmt.Println("LookupData: FILE WAS FOUND")
-				return kademlia.net.data
+				data := kademlia.net.data
+				//kademlia.net.mtx.Lock()
+				kademlia.net.data = ""
+				//kademlia.net.mtx.Unlock()
+				time.Sleep(10 * time.Millisecond)
+				return data
 			}	else if len(kademlia.net.lookupResp) > 0 && len(kademlia.net.lookupResponder) > 0 {
+				//kademlia.net.mtx.RUnlock()
+				time.Sleep(10 * time.Millisecond)
 				fmt.Println("LookupData: LOOKUPRESPONSE WAS received")
 				// if reponder missed time
-				if isElementof(kademlia.net.lookupResponder[0], missedtime){
-					missedtime = kademlia.deleteContact(kademlia.net.lookupResponder[0], missedtime)
-				} else {
+				//kademlia.net.mtx.RLock()
+				if !isElementof(kademlia.net.lookupResponder[0], missedtime){
 					currentcon = currentcon -1
 				}
 
-				//Delete from unresponded
-				kademlia.net.mtx.Lock()
-				unresponded = kademlia.deleteContact(kademlia.net.lookupResponder[0], unresponded)
+				//fmt.Println("2")
+				//Delete from ct
 				contacttimes = kademlia.deleteTime(kademlia.net.lookupResponder[0], contacttimes)
-
+				//kademlia.net.mtx.RUnlock()
+				kademlia.net.mtx.Lock()
 				//Tar bort responsen och respondern från nätverket
 				if len(kademlia.net.lookupResp) <= 1 {
 					kademlia.net.lookupResp = [][]Contact{}
-					fmt.Println(len(kademlia.net.lookupResp))
 				} else{
 					kademlia.net.lookupResp = kademlia.net.lookupResp[1:]
 				}
@@ -337,67 +370,89 @@ func (kademlia *Kademlia) LookupContact(target *Contact) []Contact {
 					kademlia.net.lookupResponder = kademlia.net.lookupResponder[1:]
 				}
 				kademlia.net.mtx.Unlock()
-
+				//fmt.Println("3")
 				//Uppdatera kclosest
 				kclosest = kademlia.net.rt.FindClosestContacts(&key, k)
-
+				fmt.Println("4")
 				//Start the missing connections (to alpha)
 				for i := 0; i < len(kclosest); i++ {
 					if currentcon < alpha {
-						if !isElementof(kclosest[i], contacted) && !isElementof(kclosest[i], unresponded) {
+						if !isElementof(kclosest[i], contacted) && !isElementof(kclosest[i], missedtime) {
 							fmt.Println("Jag startar en missing connection")
 							go kademlia.net.SendFindDataMessage(&kclosest[i], hash)
 							contacted = append(contacted, kclosest[i])
-							unresponded = append(unresponded, kclosest[i])
 							contacttimes = append(contacttimes, ContactTime{kclosest[i], time.Now()})
 							currentcon = currentcon + 1
-							time.Sleep(100 * time.Millisecond)
+							//time.Sleep(100 * time.Millisecond)
 						}
+					}else{
+						break
 					}
 				}
 			}	else{
+				//kademlia.net.mtx.RUnlock()
 				time.Sleep(250 * time.Millisecond)
 			}
 			time.Sleep(250 * time.Millisecond)
 
-			for i := 0; i<len(contacttimes); i++ {
-				if time.Now().Sub(contacttimes[i].ct).Nanoseconds() > 5000000000 {
+			for i := 0; i<len(contacttimes)-1; i++ {
+				//fmt.Println("Kollar times")
+				if time.Now().Sub(contacttimes[i].ct).Nanoseconds() > 5000000000 { //nån är sen, ta bort dom
+						//lägg till i missed time och minska currentconnections (väntar ej längre på han)
+
 					missedtime = append(missedtime, contacttimes[i].contact)
 					currentcon = currentcon -1
+					//fmt.Println("Nån har missat tiden") //Tas bort från contact times (Vi ska inte gå igenom dom igen)
 
-					for j := 0; j < len(kclosest); j++ {
+					kclosest = kademlia.net.rt.FindClosestContacts(&key, k) //Updatera kclosest
 
-						if !isElementof(kclosest[j], contacted) && !isElementof(kclosest[j], unresponded) { //om nån ej blivit kontaktad
+					for j := 0; j < len(kclosest); j++ { // Gå igenom kclosest
+
+						if !isElementof(kclosest[j], contacted) && !isElementof(kclosest[j], missedtime) { //om nån ej blivit kontaktad och inte missat tiden
+							fmt.Println("Jag startar en missing connection")
 							go kademlia.net.SendFindDataMessage(&kclosest[i], hash)
 							contacted = append(contacted, kclosest[i])
-							unresponded = append(unresponded, kclosest[i])
 							contacttimes = append(contacttimes, ContactTime{kclosest[i], time.Now()})
 							currentcon = currentcon + 1 //Öka current con
 							break							//Endast en anslutning per missad tid
 						}
+						if currentcon >= alpha { //Om tillräckligt med cons avbryt dirr
+							break
+						}
 					}
+					contacttimes = kademlia.deleteTime(contacttimes[i].contact, contacttimes)
 				}
 			}
 
 			terminate := true
 			for i := 0; i < len(kclosest); i++ {
-				if !isElementof(kclosest[i], contacted) || (!isElementof(kclosest[i], missedtime) && isElementof(kclosest[i], unresponded)){
+				if !isElementof(kclosest[i], contacted){ // Om nån inte blivit kontaktad
+					terminate = false
+				} else if !isElementof(kclosest[i], missedtime) { //eller om nån har det men inte har missat tiden
 					terminate = false
 				}
 			}
 
+			if currentcon <= 0 || len(contacted) > 100 { //If we dont have any waiting connections terminate (timeout)
+				terminate = true
+			}
+
 			if terminate {
-				return "Data not found"
+				return kademlia.LookupDataD(hash)
 			}
 
 		}
 	}
 
 	func (kademlia *Kademlia) Store(data string) {
+		fmt.Println("Storen startad i kademlia")
 		hash := []byte(data)
 		key := KademliaID(sha1.Sum(hash))
 		keystring := key.String()
 		contact := NewContact(&key, "1234567")
+		//fmt.Println("kallar lookup")
+		fs := kademlia.getFileSystem()
+		fs.Store(key, data, kademlia.GetNetwork().me.ID.String())
 		kclosest := kademlia.LookupContact(&contact)
 
 		fmt.Printf("Lookup i store blev klar Svaret och key blev", "%v\n", kclosest, keystring)
@@ -410,7 +465,7 @@ func (kademlia *Kademlia) LookupContact(target *Contact) []Contact {
 	}
 
 	func (kademlia *Kademlia) Republish(data string) {
-		fmt.Println("Republish startad från Storen")
+		fmt.Println("Republish rutinen startad från Storen")
 		time.Sleep(republishforpub*60*1000 * time.Millisecond)
 		fmt.Println("Storen startad från Republish")
 		kademlia.Store(data)
@@ -420,7 +475,7 @@ func (kademlia *Kademlia) LookupContact(target *Contact) []Contact {
 		contact := NewContact(&key, "1234567")
 		kclosest := kademlia.LookupContact(&contact)
 		keystring := key.String()
-
+		fmt.Println("Pin börjar skicka pinreqs")
 		for i := 0; i < len(kclosest); i++ {
 			go kademlia.net.SendPinMessage(&kclosest[i], keystring)
 		}
@@ -430,7 +485,7 @@ func (kademlia *Kademlia) LookupContact(target *Contact) []Contact {
 		contact := NewContact(&key, "1234567")
 		kclosest := kademlia.LookupContact(&contact)
 		keystring := key.String()
-
+		fmt.Println("Pin börjar skicka unpinreqs")
 		for i := 0; i < len(kclosest); i++ {
 			go kademlia.net.SendUnPinMessage(&kclosest[i], keystring)
 		}
@@ -445,4 +500,60 @@ func (kademlia *Kademlia) LookupContact(target *Contact) []Contact {
 			}
 		}
 		return svar
+	}
+
+	func (kademlia *Kademlia) LookupDataD(hash string) string {
+		hashb := []byte(hash)
+		key := KademliaID(sha1.Sum(hashb))
+		key2 := NewKademliaIDnp(hash)
+		fs := kademlia.GetNetwork().GetFS()
+		if fs.GetFile(key2) != ""{
+			return kademlia.net.fs.GetFile(key2)
+		}
+
+		contacted := []Contact{}
+		kclosest := kademlia.net.rt.FindClosestContacts(&key, k)
+		for i := 0; i < len(kclosest)/4; i++ {
+			if kademlia.net.data != "" {
+				return kademlia.net.data
+			}
+			go kademlia.net.SendFindDataMessage(&kclosest[i], hash)
+			go kademlia.net.SendFindContactMessage(&kclosest[i], &key2)
+			contacted = append(contacted, kclosest[i])
+		}
+
+		kclosest = kademlia.net.rt.FindClosestContacts(&key, k)
+
+		for i := 0; i < len(kclosest); i++ {
+			if kademlia.net.data != "" {
+				return kademlia.net.data
+			}
+			go kademlia.net.SendFindDataMessage(&kclosest[i], hash)
+			contacted = append(contacted, kclosest[i])
+		}
+
+		kclosest = kademlia.net.rt.FindClosestContacts(&key, k)
+		index := 0
+
+		if kademlia.net.data != "" {
+			return kademlia.net.data
+		}
+
+		starttime := time.Now()
+		currenttime := starttime
+		for {
+			currenttime = time.Now()
+			if kademlia.net.data != "" {
+				return kademlia.net.data
+			}
+			if currenttime.Sub(starttime).Nanoseconds() > 200000000000 {
+				return "Data not found"
+			}
+			time.Sleep(15 * 1000 * time.Millisecond)
+			if index <= len(kclosest) && !isElementof(kclosest[index], contacted) {
+				go kademlia.net.SendFindDataMessage(&kclosest[index], hash)
+				contacted = append(contacted, kclosest[index])
+				index = index + 1
+			}
+		}
 	}
