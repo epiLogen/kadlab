@@ -9,7 +9,7 @@ import (
 
 func TestKademlia(t *testing.T) {
 
-  n := 20
+  n := 30
 
   contacts := make([]Contact, n)
 
@@ -43,8 +43,11 @@ func TestKademlia(t *testing.T) {
   }
 
   nodes[0].Store("test")
-  time.Sleep(5*1000*time.Millisecond)
-  nodes[0].LookupData("test")
+	fmt.Println("STORE I KADTEST, SLEEPING...")
+  time.Sleep(10*1000*time.Millisecond)
+	fmt.Println("PRE LOOKUPDATA I KADTEST")
+  //result := nodes[0].LookupData("test")
+	fmt.Println("AFTER LOOKUPDATA I KADTEST")
 
 
 
