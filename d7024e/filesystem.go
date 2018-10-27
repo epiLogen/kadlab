@@ -50,7 +50,7 @@ func (fs *FileSystem) Store(key KademliaID, file string, publisher string) {
 
 }
 
-func (fs *FileSystem) GetRepublish(republishmin int) []File {
+func (fs *FileSystem) GetRepublish(republishmin int) []File { //Returns the files that should be republished
 	//fmt.Println("Getrepublish initierad")
 	svar := []File{}
 	now := time.Now()
@@ -75,7 +75,7 @@ func (fs *FileSystem) GetPos(key KademliaID) int {
 	return svar
 }
 
-func (fs *FileSystem) GetFile(key KademliaID) string {
+func (fs *FileSystem) GetFile(key KademliaID) string { //Returns the content of the file
 	fs.mtx.Lock()
 
 	svar := ""
@@ -90,7 +90,7 @@ func (fs *FileSystem) GetFile(key KademliaID) string {
 	return svar
 }
 
-func (fs *FileSystem) GetPublisher(key KademliaID) string {
+func (fs *FileSystem) GetPublisher(key KademliaID) string { //returns the publisher
 	fs.mtx.Lock()
 	svar := ""
 	pos := fs.GetPos(key)
@@ -101,7 +101,7 @@ func (fs *FileSystem) GetPublisher(key KademliaID) string {
 	return svar
 }
 
-func (fs *FileSystem) Expired(key KademliaID) bool { //Kallas med låst mtx
+func (fs *FileSystem) Expired(key KademliaID) bool { //Kallas med låst mtx returnerar om en fil har expirat
 	fmt.Println("Expired started")
 	timen := time.Now()
 	pos := fs.GetPos(key)

@@ -32,7 +32,7 @@ func NewKademlia(me Contact) (kademlia *Kademlia){
 	return kademlia
 }
 
-func (kademlia *Kademlia) StartRepublish() {
+func (kademlia *Kademlia) StartRepublish() { //Republish that is run on every node once an hour
 	fmt.Println("StartRepublish initierad")
 	rand := rand.Intn(20)
 	time.Sleep(time.Duration(republishmin) * time.Duration(60-rand) * 1000 * time.Millisecond)
@@ -83,7 +83,7 @@ func (net *Network) GetFS() FileSystem {
 	return net.fs
 }
 
-func (kademlia *Kademlia) RemoveExpired(){
+func (kademlia *Kademlia) RemoveExpired(){ //Removes expired files once each 24 hours
 	fmt.Println("Remove Expired started in network")
 	time.Sleep(24 * 60 * 60 * 1000 * time.Millisecond)
 	fs := kademlia.getFileSystem()
@@ -328,34 +328,25 @@ func (kademlia *Kademlia) LookupContact(target *Contact) []Contact {
 			if currenttime.Sub(prevtime).Nanoseconds() > 50000000000 {
 				return kademlia.LookupDataD(hash)
 			}
-			//fmt.Println("1")
 
-			// response received
-			//kademlia.net.mtx.RLock()
 			if kademlia.net.data != "" { //File found
-				//kademlia.net.mtx.RUnlock()
 				time.Sleep(10 * time.Millisecond)
 				fmt.Println("LookupData: FILE WAS FOUND")
 				data := kademlia.net.data
-				//kademlia.net.mtx.Lock()
 				kademlia.net.data = ""
-				//kademlia.net.mtx.Unlock()
 				time.Sleep(10 * time.Millisecond)
 				return data
 			}	else if len(kademlia.net.lookupResp) > 0 && len(kademlia.net.lookupResponder) > 0 {
-				//kademlia.net.mtx.RUnlock()
 				time.Sleep(10 * time.Millisecond)
 				fmt.Println("LookupData: LOOKUPRESPONSE WAS received")
 				// if reponder missed time
-				//kademlia.net.mtx.RLock()
 				if !isElementof(kademlia.net.lookupResponder[0], missedtime){
 					currentcon = currentcon -1
 				}
 
-				//fmt.Println("2")
 				//Delete from ct
 				contacttimes = kademlia.deleteTime(kademlia.net.lookupResponder[0], contacttimes)
-				//kademlia.net.mtx.RUnlock()
+
 				kademlia.net.mtx.Lock()
 				//Tar bort responsen och respondern från nätverket
 				if len(kademlia.net.lookupResp) <= 1 {
@@ -369,10 +360,10 @@ func (kademlia *Kademlia) LookupContact(target *Contact) []Contact {
 					kademlia.net.lookupResponder = kademlia.net.lookupResponder[1:]
 				}
 				kademlia.net.mtx.Unlock()
-				//fmt.Println("3")
+
 				//Uppdatera kclosest
 				kclosest = kademlia.net.rt.FindClosestContacts(&key, k)
-				//fmt.Println("4")
+
 				//Start the missing connections (to alpha)
 				for i := 0; i < len(kclosest); i++ {
 					if currentcon < alpha {
@@ -389,7 +380,6 @@ func (kademlia *Kademlia) LookupContact(target *Contact) []Contact {
 					}
 				}
 			}	else{
-				//kademlia.net.mtx.RUnlock()
 				time.Sleep(250 * time.Millisecond)
 			}
 			time.Sleep(250 * time.Millisecond)
@@ -464,7 +454,7 @@ func (kademlia *Kademlia) LookupContact(target *Contact) []Contact {
 		go kademlia.Republish(data)
 	}
 
-	func (kademlia *Kademlia) Republish(data string) {
+	func (kademlia *Kademlia) Republish(data string) { //Republish that the file publisher makes once every 24 hours
 		fmt.Println("Republish rutinen startad från Storen")
 		time.Sleep(republishforpub*60*1000 * time.Millisecond)
 		fmt.Println("Storen startad från Republish")

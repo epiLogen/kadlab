@@ -29,11 +29,11 @@ func NewNetwork(me Contact, rt *RoutingTable) Network {
 	network.me = me
 	network.rt = rt
 	network.mtx = &sync.RWMutex{}
-	network.fs = NewFileSystem()
+	network.fs = NewFileSystem()  //Filesystem used for storage
 	network.data = ""
 	return network
 }
-
+// Handles responses
 func handleRPC(ch chan []byte, me *Contact, net *Network) {
 	rawdata := <-ch
 	message := &protobuf.Kmessage{}
@@ -48,7 +48,6 @@ func handleRPC(ch chan []byte, me *Contact, net *Network) {
 	if newContact.String() == me.String() {
 		return
 	}
-	//fmt.Println("refreshar med ny contact", message.GetSenderAddr())
 	net.RefreshRT(newContact)
 
 	//Ping findnode findvalue store
@@ -58,20 +57,14 @@ func handleRPC(ch chan []byte, me *Contact, net *Network) {
 		sendMessage(message.GetSenderAddr(), resp)
 
 	case "pingresp":
-		//net.mtx.Lock()
-		//fmt.Println("I got pingresponse from:", message.GetSenderId(), message.GetSenderAddr())
 		id := NewKademliaID(message.GetSenderId())
 		responder := NewContact(id, message.GetSenderAddr())
 		net.pingResp = append(net.pingResp, responder)
-		//net.mtx.Unlock()
-		//fmt.Printf("Utskrift av pingresp", "%v,\n", net.pingResp, "\n")
 
 	case "lookup":
-		//net.mtx.Lock()
 		fmt.Println("I got a lookupreq from:", message.GetSenderId(), message.GetSenderAddr())
 		id := NewKademliaID(message.GetLookupId())
 		kclosest := net.rt.FindClosestContacts(id, 20)
-		//net.mtx.Unlock()
 		t := ""
 		for i := 0; i < len(kclosest); i++ {
 			t = t + kclosest[i].String() + "\n"
@@ -100,14 +93,12 @@ func handleRPC(ch chan []byte, me *Contact, net *Network) {
 		net.mtx.Unlock()
 		time.Sleep(10 * time.Millisecond)
 
-		//Uppdaterar routing table ebola bugfix
+		//Uppdaterar routing table
 		breakern := false
 		for i := 0; i < len(net.lookupResp); i++ {
-			//net.mtx.RLock()
 			if breakern == true {
 				break
 			} else if i > len(net.lookupResp) -1 {
-				//net.mtx.RUnlock()
 				break
 			}
 				for j := 0; j < len(net.lookupResp[i]); j++ {
@@ -125,7 +116,6 @@ func handleRPC(ch chan []byte, me *Contact, net *Network) {
 						break
 					}
 				}
-			//net.mtx.RUnlock()
 			time.Sleep(10 * time.Millisecond)
 		}
 
@@ -162,7 +152,6 @@ func handleRPC(ch chan []byte, me *Contact, net *Network) {
 		hash := []byte(message.GetData())
 		key := KademliaID(sha1.Sum(hash))
 
-		//key := NewKademliaID(message.GetKey())	//Provar regen
 		file := message.GetData()
 		publisher := message.GetSenderId()
 		net.fs.Store(key, file, publisher)
@@ -327,7 +316,7 @@ func sendMessage(Address string, message *protobuf.Kmessage) {
 		defer Conn.Close()
 		_, err = Conn.Write(data)
 		if err != nil {
-			//fmt.Println("Write Error: ", err)
+			fmt.Println("Write Error: ", err)
 		}
 	}
 
@@ -386,7 +375,6 @@ func (network *Network) SendUnPinMessage(contact *Contact, key string) {
 
 //Store RPC
 func (network *Network) SendStoreMessage(contact *Contact, key string, data string) {
-	//fmt.Println("Storen kallad jao")
 	message := buildMessage([]string{"store", network.me.ID.String(), network.me.Address, key, data})
 	sendMessage(contact.Address, message)
 }

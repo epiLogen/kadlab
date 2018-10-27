@@ -73,7 +73,7 @@ func (routingTable *RoutingTable) getBucketIndex(id *KademliaID) int {
 	return IDLength*8 - 1
 }
 
-//Test
+//Routing table printout
 func (routingTable *RoutingTable) PrintRoutingTable() {
 	for i := 0; i < len(routingTable.buckets); i++ {
 		buckets := routingTable.buckets[i]
