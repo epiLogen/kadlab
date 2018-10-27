@@ -62,7 +62,7 @@ func main() {
 		send(os.Args[1], os.Args[2], address)
 
 	default:
-		fmt.Printf("Unavalible command: %s \n", os.Args[1])
+		fmt.Printf("Wrong input: %s \n", os.Args[1])
 		os.Exit(1)
 	}
 }
@@ -80,7 +80,7 @@ func Listener(Address string) {
 	buf := make([]byte, 4096)
 	for {
 		n, _, err := Conn.ReadFromUDP(buf)
-		//fmt.Println("Received ", string(buf[0:n]), " from ", addr)
+		//fmt.Println("Received ", string(buf[0:n]), " from ", Address)
 		fmt.Println(string(buf[:n]))
 
 		if err != nil {

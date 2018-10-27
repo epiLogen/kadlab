@@ -42,9 +42,10 @@ func handler(traffic []byte, server *Server, addr string) {
 	s := strings.Split(string(traffic), ",")
 	switch s[0] {
 	case "store":
-		filedata := kademlia.KademliaID(sha1.Sum([]byte(s[1])))
+    hash := []byte(s[1])
+		key := kademlia.KademliaID(sha1.Sum(hash))
 		go server.kad.Store(s[1])
-		SendCMD(filedata.String(), addr)
+		SendCMD(key.String(), addr)
 	case "cat":
 		filehash := server.kad.LookupData(s[1])
 		if filehash == "" {

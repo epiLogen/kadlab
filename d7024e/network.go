@@ -158,7 +158,7 @@ func handleRPC(ch chan []byte, me *Contact, net *Network) {
 		time.Sleep(10 * time.Millisecond)
 
 	case "store":
-		fmt.Println("Got a store request")
+		fmt.Println("Got a store request", )
 		hash := []byte(message.GetData())
 		key := KademliaID(sha1.Sum(hash))
 

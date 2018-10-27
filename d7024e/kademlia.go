@@ -291,10 +291,9 @@ func (kademlia *Kademlia) LookupContact(target *Contact) []Contact {
 
 	func (kademlia *Kademlia) LookupData(hash string) string {
 
-		//If I have the file return it
-		hashb := []byte(hash)
-		key := KademliaID(sha1.Sum(hashb))
-		if kademlia.net.fs.GetFile(key) != ""{
+		key := NewKademliaIDnp(hash)
+		fs := kademlia.GetNetwork().GetFS()
+		if fs.GetFile(key) != ""{
 			fmt.Println("LookupData: I have the file")
 			//return kademlia.net.fs.GetFile(key)
 		}
@@ -373,7 +372,7 @@ func (kademlia *Kademlia) LookupContact(target *Contact) []Contact {
 				//fmt.Println("3")
 				//Uppdatera kclosest
 				kclosest = kademlia.net.rt.FindClosestContacts(&key, k)
-				fmt.Println("4")
+				//fmt.Println("4")
 				//Start the missing connections (to alpha)
 				for i := 0; i < len(kclosest); i++ {
 					if currentcon < alpha {
@@ -449,6 +448,7 @@ func (kademlia *Kademlia) LookupContact(target *Contact) []Contact {
 		hash := []byte(data)
 		key := KademliaID(sha1.Sum(hash))
 		keystring := key.String()
+
 		contact := NewContact(&key, "1234567")
 		//fmt.Println("kallar lookup")
 		fs := kademlia.getFileSystem()
@@ -502,34 +502,20 @@ func (kademlia *Kademlia) LookupContact(target *Contact) []Contact {
 		return svar
 	}
 
-	func (kademlia *Kademlia) LookupDataD(hash string) string {
-		hashb := []byte(hash)
-		key := KademliaID(sha1.Sum(hashb))
-		key2 := NewKademliaIDnp(hash)
-		fs := kademlia.GetNetwork().GetFS()
-		if fs.GetFile(key2) != ""{
-			return kademlia.net.fs.GetFile(key2)
-		}
+	func (kademlia *Kademlia) LookupDataD(hash string) string { //Backup lookup (20 nodes call)
+		key := NewKademliaIDnp(hash)
 
 		contacted := []Contact{}
 		kclosest := kademlia.net.rt.FindClosestContacts(&key, k)
-		for i := 0; i < len(kclosest)/4; i++ {
+		for i := 0; i < len(kclosest); i++ { //20 full k closest
 			if kademlia.net.data != "" {
 				return kademlia.net.data
+			} else if !isElementof(kclosest[i], contacted) {
+				go kademlia.net.SendFindDataMessage(&kclosest[i], hash)
+				contacted = append(contacted, kclosest[i])
+				time.Sleep(1000 * time.Millisecond)
+				kclosest = kademlia.net.rt.FindClosestContacts(&key, k)
 			}
-			go kademlia.net.SendFindDataMessage(&kclosest[i], hash)
-			go kademlia.net.SendFindContactMessage(&kclosest[i], &key2)
-			contacted = append(contacted, kclosest[i])
-		}
-
-		kclosest = kademlia.net.rt.FindClosestContacts(&key, k)
-
-		for i := 0; i < len(kclosest); i++ {
-			if kademlia.net.data != "" {
-				return kademlia.net.data
-			}
-			go kademlia.net.SendFindDataMessage(&kclosest[i], hash)
-			contacted = append(contacted, kclosest[i])
 		}
 
 		kclosest = kademlia.net.rt.FindClosestContacts(&key, k)
@@ -543,10 +529,11 @@ func (kademlia *Kademlia) LookupContact(target *Contact) []Contact {
 		currenttime := starttime
 		for {
 			currenttime = time.Now()
+			kclosest = kademlia.net.rt.FindClosestContacts(&key, k)
 			if kademlia.net.data != "" {
 				return kademlia.net.data
 			}
-			if currenttime.Sub(starttime).Nanoseconds() > 200000000000 {
+			if currenttime.Sub(starttime).Nanoseconds() > 1000000000 { //Does not crash anymore
 				return "Data not found"
 			}
 			time.Sleep(15 * 1000 * time.Millisecond)

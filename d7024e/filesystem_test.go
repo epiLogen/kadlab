@@ -11,15 +11,15 @@ func TestFileSystem(t *testing.T) {
 
   contact := NewContact(NewKademliaID("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF" + "8001"), "127.0.0.1:" + "8001")
   node := NewKademlia(contact)
-  key := NewKademliaID("test")
+  key := NewKademliaIDnp("test")
 
-  pub := node.getFileSystem().GetPublisher(*key)
-  expired := node.getFileSystem().Expired(*key)
-  pinned := node.getFileSystem().Pinned(*key)
+  pub := node.getFileSystem().GetPublisher(key)
+  expired := node.getFileSystem().Expired(key)
+  pinned := node.getFileSystem().Pinned(key)
   repubfiles := node.getFileSystem().GetRepublish(2)
-  node.getFileSystem().Pin(*key)
-  node.getFileSystem().Unpin(*key)
-  //node.getFileSystem().Delete(*key)
+  node.getFileSystem().Pin(key)
+  node.getFileSystem().Unpin(key)
+  //node.GetNetwork().GetFS().Delete(key)
 
 
 
